@@ -1,0 +1,2417 @@
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 1 - 2023/02/15 10:39:25
+
+
+       1/       0 :                     ;;; Tiny Monitor Program for 4004 evaluation board
+       2/       0 :                     ;;; Ryo Mukai
+       3/       0 :                     ;;; 2023/02/15
+       4/       0 :                     
+       5/       0 :                     ;;; DEBUG equ 1			; for ifdef DEBUG
+       6/       0 :                     
+       7/       0 :                     ;;; This source can be assembled with the Macroassembler AS
+       8/       0 :                     ;;; (http://john.ccac.rwth-aachen.de:8000/as/)
+       9/       0 :                             cpu 4004        ; AS's command to specify CPU
+      10/       0 :                     
+      11/       0 :                             include "aliases.inc" ; Aliases for register name
+(1)    1/       0 :                     ;;; function for label to address for FIM&FIN
+(1)    2/       0 :                     lo              function x, ((x)&255)
+(1)    3/       0 :                     
+(1)    4/       0 :                     ;;; functuon for setting counter for ISZ loop
+(1)    5/       0 :                     loop            function x, (16-(x))
+(1)    6/       0 :                     loops     	function x,y, ((16-(x))<<4 + (16-(y)))
+(1)    7/       0 :                     
+(1)    8/       0 :                     ;;; Conditional jumps syntax for Macroassembler AS:
+(1)    9/       0 :                     ;;; JCN T     jump if TEST = 0 - most positive voltage or +5V
+(1)   10/       0 :                     ;;; JCN TN    jump if TEST = 1 - most negative voltage or -10V
+(1)   11/       0 :                     ;;; JCN C     jump if carry = 1
+(1)   12/       0 :                     ;;; JCN CN    jump if carry = 0
+(1)   13/       0 :                     ;;; JCN Z     jump if accumulator = 0
+(1)   14/       0 :                     ;;; JCN ZN    jump if accumulator != 0
+(1)   15/       0 :                     
+(1)   16/       0 :                     ;;; Alias for Register Pairs
+(1)   17/       0 : =R0P                 P0               reg R0R1
+(1)   18/       0 : =R1P                 P1               reg R2R3
+(1)   19/       0 : =R2P                 P2               reg R4R5
+(1)   20/       0 : =R3P                 P3               reg R6R7
+(1)   21/       0 : =R4P                 P4               reg R8R9
+(1)   22/       0 : =R5P                 P5               reg RARB
+(1)   23/       0 : =R6P                 P6               reg RCRD
+(1)   24/       0 : =R7P                 P7               reg RERF
+(1)   25/       0 : =R5P                 R10R11           reg RARB
+(1)   26/       0 : =R6P                 R12R13           reg RCRD
+(1)   27/       0 : =R7P                 R14R15           reg RERF
+(1)   28/       0 :                     
+(1)   29/       0 :                     ;;; Alias for Registers
+(1)   30/       0 : =R10                 R10              reg RA
+(1)   31/       0 : =R11                 R11              reg RB
+(1)   32/       0 : =R12                 R12              reg RC
+(1)   33/       0 : =R13                 R13              reg RD
+(1)   34/       0 : =R14                 R14              reg RE
+(1)   35/       0 : =R15                 R15              reg RF
+(1)   36/       0 :                     	
+(1)   37/       0 :                     
+      12/       0 :                             include "config.inc"  ; Configuration of memory/port chips
+(1)    1/       0 :                     ;;; BANK# for DCL
+(1)    2/       0 : =0H                  BANK_RAM0      equ 0
+(1)    3/       0 : =0H                  BANK_RAM1      equ 0
+(1)    4/       0 : =1H                  BANK_RAM2      equ 1
+(1)    5/       0 : =1H                  BANK_RAM3      equ 1
+(1)    6/       0 :                     
+(1)    7/       0 :                     ;;; CHIP#=(D7.D6.000000)
+(1)    8/       0 : =0H                  CHIP_RAM0      equ 00H
+(1)    9/       0 : =40H                 CHIP_RAM1      equ 40H
+(1)   10/       0 : =0H                  CHIP_RAM2      equ 00H
+(1)   11/       0 : =40H                 CHIP_RAM3      equ 40H
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(config.inc) - Page 2 - 2023/02/15 10:39:25
+
+
+(1)   12/       0 :                     
+(1)   13/       0 :                     ;;; Serial Port (BANK# and CHIP#)
+(1)   14/       0 : =0H                  BANK_SERIAL     equ BANK_RAM0
+(1)   15/       0 : =0H                  CHIP_SERIAL     equ CHIP_RAM0
+(1)   16/       0 :                     
+(1)   17/       0 :                     ;;; Program Memory
+(1)   18/       0 : =0F00H               PM_TOP          equ 0F00H
+(1)   19/       0 : =0FFEH               PM_READ_P0_P2   equ 0FFEH
+(1)   20/       0 :                     
+(1)   21/       0 :                     ;;; Default Bank
+(1)   22/       0 : =0H                  BANK_DEFAULT	equ BANK_RAM0
+(1)   23/       0 :                     		
+(1)   24/       0 :                     
+      13/       0 :                                     
+      14/       0 :                     ;;;---------------------------------------------------------------------------
+      15/       0 :                     ;;; CPU Resisters
+      16/       0 :                     ;;;---------------------------------------------------------------------------
+      17/       0 :                     ;;; P0( R0,  R1): argument of PRINT_P0, and many functions
+      18/       0 :                     ;;; P1( R2,  R3): argument of PUTCHAR_P1, DISPLED_P1
+      19/       0 :                     ;;;               result of GETCHAR_P1
+      20/       0 :                     ;;;               PM_WRITE_P0_P1, and many functions
+      21/       0 :                     ;;; P2( R4,  R5): CTOI_P1_R5, PM_READ_P0_P2
+      22/       0 :                     ;;; P3( R6,  R7): working reg. for calculator input (error flag, digit counter)
+      23/       0 :                     ;;; P4( R8,  R9):
+      24/       0 :                     ;;; P5(R10, R11): 
+      25/       0 :                     ;;; P6(R12, R13): working regs. for loop (wait , UART, etc.), and for SRC
+      26/       0 :                     ;;; P7(R14, R15): working regs. for loop (wait , UART, etc.), and for SRC
+      27/       0 :                     ;;;---------------------------------------------------------------------------
+      28/       0 :                     
+      29/       0 :                     ;;;---------------------------------------------------------------------------
+      30/       0 :                     ;;; Memory Resisters
+      31/       0 :                     ;;;---------------------------------------------------------------------------
+      32/       0 :                     ;;; Bank0, Chip 0
+      33/       0 :                     ;;; Reg 0(D0-F, S0-3): REG_X
+      34/       0 :                     ;;; Reg 1(D0-F, S0-3): REG_Y
+      35/       0 :                     ;;; Reg 2(D0-F, S0-3): REG_Z (not implemented yet)
+      36/       0 :                     ;;; Reg 3(D0-F, S0-3): REG_T (not implemented yet)
+      37/       0 :                     ;;;---------------------------------------------------------------------------
+      38/       0 :                     ;;; Bank0, Chip 1
+      39/       0 :                     ;;; Reg 0(D0-F, S0-3): REG_M (working for multiplication/division)
+      40/       0 :                     ;;; Reg 1(D0-F, S0-3): REG_A (working for square root) (not implemented yet)
+      41/       0 :                     ;;; Reg 2(D0-F, S0-3): REG_XI (working for square root) (not implemented yet)
+      42/       0 :                     ;;; Reg 3(D0-F, S0-3): REG_H (working for square root) (not implemented yet)
+      43/       0 :                     ;;;---------------------------------------------------------------------------
+      44/       0 :                     ;;; Bank1, Chip 0
+      45/       0 :                     ;;;---------------------------------------------------------------------------
+      46/       0 :                     ;;; Bank1, Chip 1
+      47/       0 :                     ;;;---------------------------------------------------------------------------
+      48/       0 :                     
+      49/       0 :                     ;;;---------------------------------------------------------------------------
+      50/       0 :                     ;;; Number expression (simple floating point)
+      51/       0 :                     ;;;       1 11111
+      52/       0 :                     ;;; char# 5 432109876543210
+      53/       0 :                     ;;;  (+/-)D.DDDDDDDDDDDDDDD*(10^E)
+      54/       0 :                     ;;; D0-15: Fraction (D15=most significant digit, D0=least significant digit)
+      55/       0 :                     ;;; D15 denotes an integer part, but it shuld be zero except
+      56/       0 :                     ;;; while calculating addition or multiplication.
+      57/       0 :                     ;;; It is used for avoiding overflow.
+      58/       0 :                     ;;; The number is normalized so that D15 is zero and minimize exponent
+      59/       0 :                     ;;; S0: Exponent (0 to 14)
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 3 - 2023/02/15 10:39:25
+
+
+      60/       0 :                     ;;; S1: Sign of the fraction (0=positive, 15=negative)
+      61/       0 :                     ;;; S2: Error (0:no_error, 1:overflow, 2:divide_by_zero)
+      62/       0 :                     ;;;---------------------------------------------------------------------------
+      63/       0 : =1H                  REG_ERROR_OVERFLOW  equ 1
+      64/       0 : =2H                  REG_ERROR_DIVBYZERO equ 2
+      65/       0 :                     	
+      66/       0 :                     ;;;---------------------------------------------------------------------------
+      67/       0 :                     ;;; Program Start
+      68/       0 :                     ;;;---------------------------------------------------------------------------
+      69/       0 :                     
+      70/       0 :                     	org 0000H		; beginning of Program Memory
+      71/       0 :                     
+      72/       0 :                     MAIN:
+      73/       0 : F0                          CLB
+      74/       1 :                     
+      75/       1 : =>FALSE              	if (BANK_DEFAULT != 0)
+      76/       1 :                     	;; initialize DL to bank 0
+      77/       1 :                     	;; DL is assumed to be set back to BANK_DEFAULT (normally 0)
+      78/       1 :                     	;; except when in use for another banks.
+      79/       1 :                     	LDM BANK_DEFAULT
+      80/       1 :                     	DCL
+      81/       1 : [75]                 	endif
+      82/       1 :                     	
+      83/       1 : 56 5C               	JMS INIT_SERIAL ; Initialize Serial Port
+      84/       3 : 50 A6               	JMS PM_WRITE_READROUTINE ; write PM_READ code on program memory
+      85/       5 :                     
+      86/       5 :                     ;       JCN TN, $		wait for TEST="0" (button pressed)
+      87/       5 : D2                          LDM 2
+      88/       6 : 56 86                       JMS BLINK_LED   ; blink LED 2 times
+      89/       8 : 20 33               	FIM P0, lo(STR_VFD_INIT) ; init VFD
+      90/       A : 57 00                       JMS PRINT_P0;
+      91/       C : 20 0F               	FIM P0, lo(STR_OMSG) ; opening message in the Page 7
+      92/       E : 57 00                       JMS PRINT_P0;
+      93/      10 :                     
+      94/      10 :                     CMD_LOOP:
+      95/      10 : 22 5D                       FIM P1, ']'		; prompt
+      96/      12 : 56 28                       JMS PUTCHAR_P1
+      97/      14 :                     
+      98/      14 :                     L_CR:
+      99/      14 : 56 00               	JMS GETCHAR_P1
+     100/      16 : 56 7F                       JMS DISPLED_ACC
+     101/      18 : 56 6E                       JMS DISPLED_P1
+     102/      1A : 20 0D               	FIM P0, '\r'
+     103/      1C : 50 8E               	JMS CMP_P0P1
+     104/      1E : 14 14               	JCN Z, L_CR		; skip CR
+     105/      20 :                     
+     106/      20 : 56 28               	JMS PUTCHAR_P1		; echo input
+     107/      22 :                     
+     108/      22 : 20 0A               	FIM P0, '\n'
+     109/      24 : 50 8E               	JMS CMP_P0P1
+     110/      26 : 1C 2E               	JCN ZN, L0
+     111/      28 : 22 0D               	FIM P1, '\r'
+     112/      2A : 56 28               	JMS PUTCHAR_P1		; put CR
+     113/      2C : 40 10               	JUN CMD_LOOP
+     114/      2E :                     
+     115/      2E :                     L0:
+     116/      2E : 20 72               	FIM P0, 'r'		; Read data memory
+     117/      30 : 50 8E               	JMS CMP_P0P1
+     118/      32 : 1C 38               	JCN ZN, L1
+     119/      34 : 50 70               	JMS SETBANKCHIP_P5
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 4 - 2023/02/15 10:39:25
+
+
+     120/      36 : 45 00               	JUN COMMAND_R
+     121/      38 :                     L1:
+     122/      38 : 20 77               	FIM P0, 'w'		; Write to data memory
+     123/      3A : 50 8E               	JMS CMP_P0P1
+     124/      3C : 1C 42               	JCN ZN, L2
+     125/      3E : 50 70               	JMS SETBANKCHIP_P5
+     126/      40 : 45 2A               	JUN COMMAND_W
+     127/      42 :                     L2:
+     128/      42 : 20 70               	FIM P0, 'p'		; write Program memory
+     129/      44 : 50 8E               	JMS CMP_P0P1
+     130/      46 : 1C 4A               	JCN ZN, L3
+     131/      48 : 45 6D               	JUN COMMAND_P
+     132/      4A :                     L3:
+     133/      4A : 20 64               	FIM P0, 'd'		; Dump program memory
+     134/      4C : 50 8E               	JMS CMP_P0P1
+     135/      4E : 1C 52               	JCN ZN, L4
+     136/      50 : 45 AA               	JUN COMMAND_D
+     137/      52 :                     L4:
+     138/      52 : 20 6C               	FIM P0, 'l'		; cLear program memory
+     139/      54 : 50 8E               	JMS CMP_P0P1
+     140/      56 : 1C 5A               	JCN ZN, L5
+     141/      58 : 45 D3               	JUN COMMAND_L
+     142/      5A :                     L5:
+     143/      5A : 20 67               	FIM P0, 'g'		; Go to PM_TOP (0F00H)
+     144/      5C : 50 8E               	JMS CMP_P0P1
+     145/      5E : 1C 62               	JCN ZN, L6
+     146/      60 : 45 E1               	JUN COMMAND_G
+     147/      62 :                     L6:
+     148/      62 : 20 63               	FIM P0, 'c'		; Calculator
+     149/      64 : 50 8E               	JMS CMP_P0P1
+     150/      66 : 1C 6A               	JCN ZN, L9
+     151/      68 : 41 00               	JUN COMMAND_C
+     152/      6A :                     L9:
+     153/      6A : 20 65               	FIM P0, lo(STR_CMDERR)
+     154/      6C : 57 00               	JMS PRINT_P0
+     155/      6E : 40 10               	JUN CMD_LOOP
+     156/      70 :                     
+     157/      70 :                     ;;;---------------------------------------------------------------------------
+     158/      70 :                     ;;; SETBANKCHIP_P5
+     159/      70 :                     ;;; Set #bank and #chip to R10 and R11
+     160/      70 :                     ;;;---------------------------------------------------------------------------
+     161/      70 :                     SETBANKCHIP_P5:
+     162/      70 : 20 38               	FIM P0, lo(STR_BANK)	; print " BANK="
+     163/      72 : 57 00               	JMS PRINT_P0
+     164/      74 : 56 00               	JMS GETCHAR_P1
+     165/      76 : 56 28               	JMS PUTCHAR_P1
+     166/      78 : 56 62               	JMS CTOI_P1_R5
+     167/      7A : A5                  	LD R5
+     168/      7B : BA                  	XCH R10			; save BANK to R10
+     169/      7C :                     
+     170/      7C : 20 3F               	FIM P0, lo(STR_CHIP)	; print " CHIP="
+     171/      7E : 57 00               	JMS PRINT_P0
+     172/      80 : 56 00               	JMS GETCHAR_P1
+     173/      82 : 56 28               	JMS PUTCHAR_P1
+     174/      84 : 56 62               	JMS CTOI_P1_R5
+     175/      86 : 56 53               	JMS PRINT_CRLF
+     176/      88 : F0                  	CLB
+     177/      89 : A5                  	LD R5		; R5 is #chip(0.0.D3.D2)
+     178/      8A : F5                  	RAL
+     179/      8B : F5                  	RAL
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 5 - 2023/02/15 10:39:25
+
+
+     180/      8C : BB                  	XCH R11 	;set D3D2.00@X2 to R11 (0000 or 0100 or 1000 or 1100)
+     181/      8D : C0                  	BBL 0
+     182/      8E :                     	
+     183/      8E :                     ;;;---------------------------------------------------------------------------
+     184/      8E :                     ;;; CMP_P0P1
+     185/      8E :                     ;;; compare P0(R0R1) and P1(R2R3)
+     186/      8E :                     ;;; input: P0, P1
+     187/      8E :                     ;;; output: ACC=1,CY=0 if P0<P1
+     188/      8E :                     ;;;         ACC=0,CY=1 if P0==P1 
+     189/      8E :                     ;;;         ACC=1,CY=1 if P0>P1
+     190/      8E :                     ;;; P0 - P1 (the carry bit is a complement of the borrow)
+     191/      8E :                     ;;;---------------------------------------------------------------------------
+     192/      8E :                     CMP_P0P1:
+     193/      8E : F0                  	CLB
+     194/      8F : A0                  	LD R0			
+     195/      90 : 92                  	SUB R2			;R0-R2
+     196/      91 : 14 96               	JCN Z, CMP_L1
+     197/      93 : 12 9F               	JCN C, CMP_EXIT11
+     198/      95 : C1                  	BBL 1			;P0<P1,  ACC=1, CY=0
+     199/      96 :                     CMP_L1:	
+     200/      96 : F0                  	CLB
+     201/      97 : A1                  	LD R1
+     202/      98 : 93                  	SUB R3			;R1-R3
+     203/      99 : 14 9E               	JCN Z, CMP_EXIT01
+     204/      9B : 12 9F               	JCN C, CMP_EXIT11
+     205/      9D : C1                  	BBL 1			;P0<P1,  ACC=1, CY=0
+     206/      9E :                     CMP_EXIT01:
+     207/      9E : C0                  	BBL 0			;P0==P1, ACC=0, CY=1
+     208/      9F :                     CMP_EXIT11
+     209/      9F : C1                  	BBL 1			;P0>P1,  ACC=1, CY=1
+     210/      A0 :                     	
+     211/      A0 :                     ;;;---------------------------------------------------------------------------
+     212/      A0 :                     ;;; PM_WRITE_PO_P1
+     213/      A0 :                     ;;; Write to program memory located at Page 15 (0F00H-0FFFH)
+     214/      A0 :                     ;;; (0F00H+P0) = P1
+     215/      A0 :                     ;;; input: P0, P1
+     216/      A0 :                     ;;; output: none
+     217/      A0 :                     ;;;---------------------------------------------------------------------------
+     218/      A0 :                     	
+     219/      A0 :                     PM_WRITE_P0_P1:
+     220/      A0 : 21                  	SRC P0
+     221/      A1 : A2                  	LD R2
+     222/      A2 : E3                  	WPM
+     223/      A3 : A3                  	LD R3
+     224/      A4 : E3                  	WPM
+     225/      A5 : C0                  	BBL 0
+     226/      A6 :                     
+     227/      A6 :                     ;;;---------------------------------------------------------------------------
+     228/      A6 :                     ;;; PM_WRITE_READROUTINE
+     229/      A6 :                     ;;; preparation for reading program memory
+     230/      A6 :                     ;;;---------------------------------------------------------------------------
+     231/      A6 :                     PM_WRITE_READROUTINE:	
+     232/      A6 : 20 FE               	FIM P0, lo(PM_READ_P0_P2)
+     233/      A8 : 22 34               	FIM P1, 34H		; FIN P2
+     234/      AA : 50 A0               	JMS PM_WRITE_P0_P1
+     235/      AC : 61                  	INC R1
+     236/      AD : 22 C0               	FIM P1, 0C0H		; BBL 0
+     237/      AF : 50 A0               	JMS PM_WRITE_P0_P1
+     238/      B1 : C0                  	BBL 0
+     239/      B2 :                     
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 6 - 2023/02/15 10:39:25
+
+
+     240/     100 :                     	org 0100H
+     241/     100 :                     ;;;---------------------------------------------------------------------------
+     242/     100 :                     ;;;COMMAND_C
+     243/     100 :                     ;;; 	Calculator
+     244/     100 :                     ;;; P0(R0, R1): working for PRINT
+     245/     100 :                     ;;; P1(R2, R3): working for PRINT, GETCHAR, PUTCHAR
+     246/     100 :                     ;;; P2(R4, R5): working for CTOI
+     247/     100 :                     ;;; P3(R6, R7):   
+     248/     100 :                     ;;; 		  R6.bit0 = input start flag (0:not started, 1:started)
+     249/     100 :                     ;;;               R6.bit1 = input full flag (0:not full, 1:full)
+     250/     100 :                     ;;; 	          R6.bit3 = digit point flag(0:no dp, 1:dp set)
+     251/     100 :                     ;;; 	          R7=digit counter for key input
+     252/     100 :                     ;;; P4(R8,  R9):  register address and character index(mainly REG_X)
+     253/     100 :                     ;;; P5(R10, R11): register address and character index(mainly REG_Y)
+     254/     100 :                     ;;; P6(R12, R13): working for register operation
+     255/     100 :                     ;;; P7(R14, R15): working for register operation
+     256/     100 :                     ;;;---------------------------------------------------------------------------
+     257/     100 :                     COMMAND_C:
+     258/     100 : 20 51               	FIM P0, lo(STR_CALC)
+     259/     102 : 57 00               	JMS PRINT_P0
+     260/     104 :                     
+     261/     104 : 41 97               	JUN CMDC_CLEAR		; clear registers
+     262/     106 :                     CMDC_LOOP_START:
+     263/     106 : 26 01               	FIM P3, 01H		; clear start, full, point flags
+     264/     108 :                     				; and set digit counter R7 1
+     265/     108 : 43 34               	JUN PRINT_RESULT_AND_ENTER_TO_Y ; this may be modified
+     266/     10A :                     					; when REG_Z or REG_T exists
+     267/     10A :                     CMDC_LOOP_NUMIN:
+     268/     10A : 56 00               	JMS GETCHAR_P1
+     269/     10C : 56 7F                       JMS DISPLED_ACC
+     270/     10E : 56 6E                       JMS DISPLED_P1
+     271/     110 : 20 0D               	FIM P0, '\r'
+     272/     112 : 50 8E               	JMS CMP_P0P1
+     273/     114 : 14 0A               	JCN Z, CMDC_LOOP_NUMIN	; skip CR
+     274/     116 :                     
+     275/     116 : 20 0A               	FIM P0, '\n'
+     276/     118 : 50 8E               	JMS CMP_P0P1
+     277/     11A : 1C 20               	JCN ZN, CMDC_L1
+     278/     11C : 56 53               	JMS PRINT_CRLF
+     279/     11E : 41 A1               	JUN CMDC_ENTER
+     280/     120 :                     CMDC_L1:
+     281/     120 : 20 71               	FIM P0, 'q'		; quit
+     282/     122 : 50 8E               	JMS CMP_P0P1
+     283/     124 : 1C 2A               	JCN ZN, CMDC_L2
+     284/     126 : 56 53               	JMS PRINT_CRLF
+     285/     128 : 40 10               	JUN CMD_LOOP		; return to command loop
+     286/     12A :                     CMDC_L2:	
+     287/     12A : 20 2B               	FIM P0, '+'
+     288/     12C : 50 8E               	JMS CMP_P0P1
+     289/     12E : 1C 34               	JCN ZN, CMDC_L3
+     290/     130 : 56 28               	JMS PUTCHAR_P1
+     291/     132 : 42 00               	JUN CMDC_ADD
+     292/     134 :                     CMDC_L3:
+     293/     134 : 20 2D               	FIM P0, '-'
+     294/     136 : 50 8E               	JMS CMP_P0P1
+     295/     138 : 1C 3E               	JCN ZN, CMDC_L4
+     296/     13A : 56 28               	JMS PUTCHAR_P1
+     297/     13C : 43 40               	JUN CMDC_SUB
+     298/     13E :                     CMDC_L4:
+     299/     13E : 20 2A               	FIM P0, '*'
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 7 - 2023/02/15 10:39:25
+
+
+     300/     140 : 50 8E               	JMS CMP_P0P1
+     301/     142 : 1C 48               	JCN ZN, CMDC_L5
+     302/     144 : 56 28               	JMS PUTCHAR_P1
+     303/     146 : 42 9B               	JUN CMDC_MUL
+     304/     148 :                     CMDC_L5:
+     305/     148 : 20 2F               	FIM P0, '/'
+     306/     14A : 50 8E               	JMS CMP_P0P1
+     307/     14C : 1C 52               	JCN ZN, CMDC_L6
+     308/     14E : 56 28               	JMS PUTCHAR_P1
+     309/     150 : 44 00               	JUN CMDC_DIV
+     310/     152 :                     CMDC_L6:
+     311/     152 : 20 63               	FIM P0, 'c'
+     312/     154 : 50 8E               	JMS CMP_P0P1
+     313/     156 : 1C 5C               	JCN ZN, CMDC_L7
+     314/     158 : 56 53               	JMS PRINT_CRLF
+     315/     15A : 41 97               	JUN CMDC_CLEAR
+     316/     15C :                     CMDC_L7:
+     317/     15C : 20 73               	FIM P0, 's'
+     318/     15E : 50 8E               	JMS CMP_P0P1
+     319/     160 : 1C 68               	JCN ZN, CMDC_L8
+     320/     162 :                     	;; change sign of REG_X
+     321/     162 : 53 D7               	JMS CHANGE_SIGN_REG_X
+     322/     164 : 56 53               	JMS PRINT_CRLF
+     323/     166 : 43 2A               	JUN CMDC_PRINT
+     324/     168 :                     CMDC_L8:
+     325/     168 : 20 70               	FIM P0, 'p'
+     326/     16A : 50 8E               	JMS CMP_P0P1
+     327/     16C : 1C 72               	JCN ZN, CMDC_L9
+     328/     16E : 56 53               	JMS PRINT_CRLF
+     329/     170 : 43 2A               	JUN CMDC_PRINT
+     330/     172 :                     CMDC_L9:
+     331/     172 : A6                  	LD R6			; check R6.bit1
+     332/     173 : F6                  	RAR			; no more '0-9' or '.' input
+     333/     174 : F6                  	RAR			; when register is full (has 16 digits)
+     334/     175 : 12 89               	JCN C, CMDC_L11
+     335/     177 :                     
+     336/     177 : 20 2E               	FIM P0, '.'
+     337/     179 : 50 8E               	JMS CMP_P0P1
+     338/     17B : 1C 81               	JCN ZN, CMDC_L10
+     339/     17D : 51 8B               	JMS CMDC_CLEAR_REGX_IF_FIRST_KEYIN
+     340/     17F : 41 AD               	JUN CMDC_DIGITPOINT
+     341/     181 :                     	
+     342/     181 :                     CMDC_L10:
+     343/     181 : 53 5A               	JMS ISNUM_P1
+     344/     183 : 14 89               	JCN Z, CMDC_L11          ; not a number
+     345/     185 : 51 8B               	JMS CMDC_CLEAR_REGX_IF_FIRST_KEYIN
+     346/     187 : 41 B8               	JUN CMDC_NUM
+     347/     189 :                     CMDC_L11:
+     348/     189 : 41 0A               	JUN CMDC_LOOP_NUMIN
+     349/     18B :                     
+     350/     18B :                     ;;;---------------------------------------------------------------------------
+     351/     18B :                     ;;; CMDC_CLEAR_REGX_IF_FIRST_KEYIN
+     352/     18B :                     ;;;   clear REG_X for the first '0-9' or '.'
+     353/     18B :                     ;;;---------------------------------------------------------------------------
+     354/     18B :                     CMDC_CLEAR_REGX_IF_FIRST_KEYIN:
+     355/     18B : A6                  	LD R6                   ; check input already started (R6.bit0)
+     356/     18C : F6                  	RAR
+     357/     18D : 12 96               	JCN C, FKEY_EXIT
+     358/     18F : FA                  	STC
+     359/     190 : F5                  	RAL			; set input start flag
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 8 - 2023/02/15 10:39:25
+
+
+     360/     191 : B6                  	XCH R6
+     361/     192 : 20 00               	FIM P0, REG_X
+     362/     194 : 53 A9               	JMS CLEAR_REGISTER_P0	; clear X for the first keyin
+     363/     196 :                     FKEY_EXIT:
+     364/     196 : C0                  	BBL 0
+     365/     197 :                     
+     366/     197 :                     ;;;---------------------------------------------------------------------------
+     367/     197 :                     ;;; CHIP#(=D7.D6), REG#(=D5.D4) of number registers 
+     368/     197 :                     ;;;---------------------------------------------------------------------------
+     369/     197 : =0H                  REG_X  	equ (CHIP_RAM0+(0<<4))	; CHIP#.00.0000
+     370/     197 : =10H                 REG_Y	equ (CHIP_RAM0+(1<<4))	; CHIP#.01.0000
+     371/     197 : =20H                 REG_Z  	equ (CHIP_RAM0+(2<<4))	; CHIP#.10.0000
+     372/     197 : =30H                 REG_T	equ (CHIP_RAM0+(3<<4))	; CHIP#.11.0000
+     373/     197 :                     
+     374/     197 : =40H                 REG_M	equ (CHIP_RAM1+(0<<4))	; CHIP#.00.0000
+     375/     197 : =50H                 REG_A	equ (CHIP_RAM1+(1<<4))	; CHIP#.01.0000
+     376/     197 : =60H                 REG_XI	equ (CHIP_RAM1+(2<<4))	; CHIP#.10.0000
+     377/     197 : =70H                 REG_H	equ (CHIP_RAM1+(3<<4))	; CHIP#.11.0000
+     378/     197 :                     	
+     379/     197 :                     ;;;---------------------------------------------------------------------------
+     380/     197 :                     ;;; CMDC_CLEAR
+     381/     197 :                     ;;; clear registers and jump to main loop of the calculator
+     382/     197 :                     ;;;---------------------------------------------------------------------------
+     383/     197 :                     CMDC_CLEAR:
+     384/     197 : 20 00               	FIM P0, REG_X
+     385/     199 : 53 A9               	JMS CLEAR_REGISTER_P0
+     386/     19B : 20 10               	FIM P0, REG_Y
+     387/     19D : 53 A9               	JMS CLEAR_REGISTER_P0
+     388/     19F : 41 06               	JUN CMDC_LOOP_START
+     389/     1A1 :                     	
+     390/     1A1 :                     ;;;---------------------------------------------------------------------------
+     391/     1A1 :                     ;;; CMDC_ENTER
+     392/     1A1 :                     ;;; LOAD Y <= X
+     393/     1A1 :                     ;;;---------------------------------------------------------------------------
+     394/     1A1 :                     CMDC_ENTER:
+     395/     1A1 : 20 00                	FIM P0, REG_X
+     396/     1A3 : 52 72                	JMS NORMALIZE_REGISTER_P0
+     397/     1A5 : 2C 10               	FIM P6, REG_Y
+     398/     1A7 : 2E 00               	FIM P7, REG_X
+     399/     1A9 : 53 B5               	JMS LD_REGISTER_P6_P7	; Y<=X
+     400/     1AB : 41 06                	JUN CMDC_LOOP_START
+     401/     1AD :                     
+     402/     1AD :                     ;;;---------------------------------------------------------------------------
+     403/     1AD :                     ;;; CMDC_DIGITPOINT
+     404/     1AD :                     ;;; set a digit point
+     405/     1AD :                     ;;;---------------------------------------------------------------------------
+     406/     1AD :                     CMDC_DIGITPOINT
+     407/     1AD : A6                  	LD R6
+     408/     1AE : F5                  	RAL
+     409/     1AF : 12 B6               	JCN C, CMDC_DP_EXIT	; skip if digit point flag (R6.bit3)
+     410/     1B1 :                     				; is already set
+     411/     1B1 : FA                  	STC			; else set digit point flag R6.bit3
+     412/     1B2 : F6                  	RAR
+     413/     1B3 : B6                  	XCH R6                  
+     414/     1B4 :                     
+     415/     1B4 : 56 28               	JMS PUTCHAR_P1		; put '.'
+     416/     1B6 :                     CMDC_DP_EXIT:	
+     417/     1B6 : 41 0A               	JUN CMDC_LOOP_NUMIN
+     418/     1B8 :                     
+     419/     1B8 :                     ;;;---------------------------------------------------------------------------
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 9 - 2023/02/15 10:39:25
+
+
+     420/     1B8 :                     ;;; CMDC_NUM
+     421/     1B8 :                     ;;; enter a number to X
+     422/     1B8 :                     ;;;---------------------------------------------------------------------------
+     423/     1B8 :                     CMDC_NUM:
+     424/     1B8 : 56 62               	JMS CTOI_P1_R5
+     425/     1BA : A6                  	LD R6			; check digit point flag (R6.bit3)
+     426/     1BB : F5                  	RAL
+     427/     1BC : 12 C5               	JCN C,CMDC_L0		; digit point flag is ture
+     428/     1BE :                     	
+     429/     1BE : A5                  	LD R5			; when digit point frag is false,
+     430/     1BF : 1C C5               	JCN NZ, CMDC_L0		; ignore key in '0' if digit counter is 1
+     431/     1C1 : A7                  	LD R7		
+     432/     1C2 : F8                  	DAC
+     433/     1C3 : 14 E1               	JCN Z, CMDC_NUM_EXIT
+     434/     1C5 :                     CMDC_L0:
+     435/     1C5 :                     	;; operation is for R7-th digit of X
+     436/     1C5 : 2E 00               	FIM P7, REG_X
+     437/     1C7 : DF                  	LDM 15
+     438/     1C8 : F1                  	CLC
+     439/     1C9 : 97                  	SUB R7			
+     440/     1CA : BF                  	XCH R15                 ; P7=(REG_X).(#char=15-R7)
+     441/     1CB : 2F                  	SRC P7
+     442/     1CC :                     
+     443/     1CC : A6                  	LD R6
+     444/     1CD : F5                  	RAL			; check R6.bit3 (dp flag)
+     445/     1CE : 12 D2               	JCN C, CMDC_SETNUM	; not set exponent
+     446/     1D0 :                     	;; set exponent of X
+     447/     1D0 : A7                  	LD R7
+     448/     1D1 : E4                  	WR0
+     449/     1D2 :                     CMDC_SETNUM:
+     450/     1D2 : A5                  	LD R5
+     451/     1D3 : E0                  	WRM
+     452/     1D4 : 67                  	INC R7
+     453/     1D5 : DF                  	LDM 15			; maximum number of digits is 14,
+     454/     1D6 : F1                  	CLC			; so set digit full flag when R7 becomes 15
+     455/     1D7 : 97                  	SUB R7
+     456/     1D8 : 1C E1               	JCN ZN, CMDC_NUM_EXIT
+     457/     1DA :                     	;; set digit full flag R6.bit1
+     458/     1DA : A6                  	LD R6
+     459/     1DB : F6                  	RAR
+     460/     1DC : F6                  	RAR
+     461/     1DD : FA                  	STC
+     462/     1DE : F5                  	RAL
+     463/     1DF : F5                  	RAL
+     464/     1E0 : B6                  	XCH R6
+     465/     1E1 :                     CMDC_NUM_EXIT:
+     466/     1E1 : 56 28               	JMS PUTCHAR_P1		; echo input
+     467/     1E3 : 41 0A               	JUN CMDC_LOOP_NUMIN
+     468/     1E5 :                     
+     469/     1E5 :                     ;;;---------------------------------------------------------------------------
+     470/     1E5 :                     ;;; SUB_FRACTION_P6_P7
+     471/     1E5 :                     ;;; subtract fraction
+     472/     1E5 :                     ;;; REG(P6) = REG(P6) - REG(P7)
+     473/     1E5 :                     ;;; REG(P6) should be equal or larger than REG(P7)
+     474/     1E5 :                     ;;; in order to avoid underflow
+     475/     1E5 :                     ;;; destroy: R13, R15, (R12 and R14 are not affected)
+     476/     1E5 :                     ;;;---------------------------------------------------------------------------
+     477/     1E5 :                     ;;; Reference
+     478/     1E5 :                     ;;; "Intel MCS-4 Assembly Language Programming Manual" Dec.1973,
+     479/     1E5 :                     ;;; 4.8 Decimal Subtraction, pp.4-20--23
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 10 - 2023/02/15 10:39:25
+
+
+     480/     1E5 :                     ;;;---------------------------------------------------------------------------
+     481/     1E5 :                     SUB_FRACTION_P6_P7:
+     482/     1E5 : F0                  	CLB
+     483/     1E6 : BD                  	XCH R13
+     484/     1E7 : F0                  	CLB
+     485/     1E8 : BF                  	XCH R15
+     486/     1E9 : F0                  	CLB
+     487/     1EA : FA                  	STC
+     488/     1EB :                     SUB_FRA_LOOP:
+     489/     1EB : F9                  	TCS
+     490/     1EC : 2F                  	SRC P7
+     491/     1ED : E8                  	SBM
+     492/     1EE :                     
+     493/     1EE : F1                  	CLC
+     494/     1EF : 2D                  	SRC P6
+     495/     1F0 : EB                  	ADM
+     496/     1F1 :                     
+     497/     1F1 : FB                  	DAA
+     498/     1F2 : E0                  	WRM
+     499/     1F3 : 6D                  	INC R13
+     500/     1F4 : 7F EB               	ISZ R15, SUB_FRA_LOOP
+     501/     1F6 : C0                  	BBL 0
+     502/     1F7 :                     
+     503/     200 :                     	org 0200H
+     504/     200 :                     ;;;---------------------------------------------------------------------------
+     505/     200 :                     ;;; CMDC_ADD
+     506/     200 :                     ;;; X = X + Y
+     507/     200 :                     ;;;---------------------------------------------------------------------------
+     508/     200 :                     CMDC_ADD:
+     509/     200 : 56 53               	JMS PRINT_CRLF
+     510/     202 : 53 87               	JMS ALIGN_REGISTER_XY
+     511/     204 :                     
+     512/     204 : 2C 00               	FIM P6, REG_X
+     513/     206 : 2E 10               	FIM P7, REG_Y
+     514/     208 : 2D                  	SRC P6			; check sign of REG_X and REG_Y same or not
+     515/     209 : ED                  	RD1
+     516/     20A : B0                  	XCH R0			; R0 = sign of X
+     517/     20B : 2F                  	SRC P7
+     518/     20C : ED                  	RD1
+     519/     20D : F1                  	CLC
+     520/     20E : 90                  	SUB R0
+     521/     20F : 14 31                	JCN Z, CMDC_ADD_SAMESIGN
+     522/     211 :                     
+     523/     211 : 52 58               	JMS CMP_FRACTION_P6_P7
+     524/     213 : 14 39               	JCN Z, CMDC_ADD_ZERO_EXIT
+     525/     215 : 12 29               	JCN C, CMD_SUB_X_Y	; P6 > P7
+     526/     217 :                     CMD_SUB_Y_X:
+     527/     217 : 2C 40               	FIM P6, REG_M		; swap X and Y
+     528/     219 : 2E 00               	FIM P7, REG_X
+     529/     21B : 53 B5               	JMS LD_REGISTER_P6_P7	; M<=X
+     530/     21D : 2C 00               	FIM P6, REG_X
+     531/     21F : 2E 10               	FIM P7, REG_Y
+     532/     221 : 53 B5               	JMS LD_REGISTER_P6_P7	; X<=Y
+     533/     223 : 2C 10               	FIM P6, REG_Y
+     534/     225 : 2E 40               	FIM P7, REG_M
+     535/     227 : 53 B5               	JMS LD_REGISTER_P6_P7	; Y<=M
+     536/     229 :                     
+     537/     229 :                     CMD_SUB_X_Y:	
+     538/     229 : 2C 00               	FIM P6, REG_X
+     539/     22B : 2E 10               	FIM P7, REG_Y
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 11 - 2023/02/15 10:39:25
+
+
+     540/     22D : 51 E5               	JMS SUB_FRACTION_P6_P7
+     541/     22F :                     
+     542/     22F : 42 37               	JUN CMDC_ADD_EXIT
+     543/     231 :                     
+     544/     231 :                     CMDC_ADD_SAMESIGN:
+     545/     231 : 2C 00               	FIM P6, REG_X
+     546/     233 : 2E 10               	FIM P7, REG_Y
+     547/     235 : 52 49               	JMS ADD_FRACTION_P6_P7
+     548/     237 :                     	
+     549/     237 :                     CMDC_ADD_EXIT:
+     550/     237 : 42 3F               	JUN CMDC_NORMALIZE_AND_EXIT
+     551/     239 :                     
+     552/     239 :                     CMDC_ADD_ZERO_EXIT:
+     553/     239 : 20 00               	FIM P0, REG_X
+     554/     23B : 53 A9               	JMS CLEAR_REGISTER_P0
+     555/     23D : 42 37               	JUN CMDC_ADD_EXIT
+     556/     23F :                     
+     557/     23F :                     ;;;---------------------------------------------------------------------------
+     558/     23F :                     ;;; CMDC_NORMALIZE_AND_EXIT
+     559/     23F :                     ;;; Common routine for finish calculation
+     560/     23F :                     ;;; Normalize REG_X
+     561/     23F :                     ;;; Clear REG_Y
+     562/     23F :                     ;;; Rotate registers is to be implemented (for REG_Z or REG_T)
+     563/     23F :                     ;;;---------------------------------------------------------------------------
+     564/     23F :                     CMDC_NORMALIZE_AND_EXIT:
+     565/     23F : 20 00                	FIM P0, REG_X
+     566/     241 : 52 72                	JMS NORMALIZE_REGISTER_P0
+     567/     243 : 20 10               	FIM P0, REG_Y
+     568/     245 : 53 A9               	JMS CLEAR_REGISTER_P0
+     569/     247 : 41 06               	JUN CMDC_LOOP_START
+     570/     249 :                     
+     571/     249 :                     ;;;---------------------------------------------------------------------------
+     572/     249 :                     ;;; ADD_FRACTION_P6_P7
+     573/     249 :                     ;;; Add fraction of two registers
+     574/     249 :                     ;;; REG(P6) = REG(P6) + REG(P7)
+     575/     249 :                     ;;; register should be normalized so that D15 = 0
+     576/     249 :                     ;;; in order to avoid overflow
+     577/     249 :                     ;;; destroy: R13, R15, (R12 and R14 are not affected)
+     578/     249 :                     ;;;---------------------------------------------------------------------------
+     579/     249 :                     ADD_FRACTION_P6_P7:
+     580/     249 : F0                  	CLB
+     581/     24A : BD                  	XCH R13
+     582/     24B : F0                  	CLB
+     583/     24C : BF                  	XCH R15
+     584/     24D : F0                  	CLB
+     585/     24E :                     ADD_FRA_LOOP:
+     586/     24E : 2F                  	SRC P7
+     587/     24F : E9                  	RDM
+     588/     250 : 2D                  	SRC P6
+     589/     251 : EB                  	ADM
+     590/     252 : FB                  	DAA
+     591/     253 : E0                  	WRM
+     592/     254 : 6D                  	INC R13
+     593/     255 : 7F 4E               	ISZ R15, ADD_FRA_LOOP
+     594/     257 :                     ADD_FRA_EXIT:	
+     595/     257 : C0                  	BBL 0
+     596/     258 :                     	
+     597/     258 :                     ;;;---------------------------------------------------------------------------
+     598/     258 :                     ;;; CMP_FRACTION_P6_P7
+     599/     258 :                     ;;; compare fraction of REG(P6) and REG(P7)
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 12 - 2023/02/15 10:39:25
+
+
+     600/     258 :                     ;;; output: ACC=1,CY=0 if REG(P6) < REG(P7)
+     601/     258 :                     ;;;         ACC=0,CY=1 if REG(P6)== REG(P7)
+     602/     258 :                     ;;;         ACC=1,CY=1 if REG(P6) > REG(P7)
+     603/     258 :                     ;;; REG(P6) - (P7) (the carry bit is a complement of the borrow)
+     604/     258 :                     ;;; working: R0, R1
+     605/     258 :                     ;;; destroy: P0, R13, R15, (R12 and R14 are not affected)
+     606/     258 :                     ;;;---------------------------------------------------------------------------
+     607/     258 :                     CMP_FRACTION_P6_P7:	
+     608/     258 : F0                  	CLB
+     609/     259 : B0                  	XCH R0			; R0 = 0
+     610/     25A :                     
+     611/     25A :                     CMP_FRACTION_LOOP:		; for i(R0)=0 to 15
+     612/     25A : A0                  	LD R0
+     613/     25B : F4                  	CMA
+     614/     25C : BD                  	XCH R13
+     615/     25D : 2D                  	SRC P6
+     616/     25E : E9                  	RDM
+     617/     25F : B1                  	XCH R1			; R1=REG(P6)[15-i]
+     618/     260 :                     
+     619/     260 : A0                  	LD R0
+     620/     261 : F4                  	CMA
+     621/     262 : BF                  	XCH R15
+     622/     263 : 2F                  	SRC P7
+     623/     264 :                     
+     624/     264 : A1                  	LD R1
+     625/     265 : F1                  	CLC
+     626/     266 : E8                  	SBM			; ACC=REG(P6)[15-i] - REG(P7)[15-i]
+     627/     267 :                     
+     628/     267 : 14 6D               	JCN Z, CMP_FRACTION_NEXT
+     629/     269 : 12 71               	JCN C, CMP_FRACTION_EXIT11
+     630/     26B : 42 70               	JUN CMP_FRACTION_EXIT10
+     631/     26D :                     
+     632/     26D :                     CMP_FRACTION_NEXT:
+     633/     26D : 70 5A               	ISZ R0, CMP_FRACTION_LOOP
+     634/     26F : C0                  	BBL 0			; REG(P6) == REG(P7)
+     635/     270 :                     
+     636/     270 :                     CMP_FRACTION_EXIT10:
+     637/     270 : C1                  	BBL 1			; REG(P6) < REG(P7)
+     638/     271 :                     
+     639/     271 :                     CMP_FRACTION_EXIT11:
+     640/     271 : C1                  	BBL 1			; REG(P6) > REG(P7)
+     641/     272 :                     
+     642/     272 :                     ;;;---------------------------------------------------------------------------
+     643/     272 :                     ;;; NORMALIZE_REGISTER_P0
+     644/     272 :                     ;;; minimize exponent
+     645/     272 :                     ;;; example
+     646/     272 :                     ;;; 0.0000001 E 9 ->shift L7->  1.0000000 E 2 -> shift R1 -> 0.10000000 E3
+     647/     272 :                     ;;; 0.0000001 E 7 ->shift L7->  1.0000000 E 0 -> shift R1 -> 0.10000000 E1
+     648/     272 :                     ;;; 0.0000001 E 5 ->shift L5->  0.0100000 E 0
+     649/     272 :                     ;;; 
+     650/     272 :                     ;;; working: P0, R2, R3
+     651/     272 :                     ;;;---------------------------------------------------------------------------
+     652/     272 :                     NORMALIZE_REGISTER_P0:	
+     653/     272 : 21                  	SRC P0
+     654/     273 : EC                  	RD0			; exponent of REG(P0)
+     655/     274 : F4                  	CMA
+     656/     275 : B3                  	XCH R3			; R3 = 15 - exponent
+     657/     276 :                     	
+     658/     276 : F0                  	CLB
+     659/     277 : B2                  	XCH R2			; R2=0 (counter)
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 13 - 2023/02/15 10:39:25
+
+
+     660/     278 : 42 82               	JUN NM_LOOP_ENTRY
+     661/     27A :                     NM_LOOP:
+     662/     27A : A2                  	LD R2
+     663/     27B : F4                  	CMA
+     664/     27C : B1                  	XCH R1			; R1=15, 14,.., 0
+     665/     27D : 21                  	SRC P0
+     666/     27E : E9                  	RDM
+     667/     27F : 1C 84               	JCN ZN, NM_GO_SHIFT
+     668/     281 : 62                  	INC R2
+     669/     282 :                     NM_LOOP_ENTRY:
+     670/     282 : 73 7A               	ISZ R3, NM_LOOP
+     671/     284 :                     NM_GO_SHIFT:
+     672/     284 :                     	;  exponent = exponent - shift count
+     673/     284 : EC                  	RD0
+     674/     285 : F1                  	CLC
+     675/     286 : 92                  	SUB R2
+     676/     287 : E4                  	WR0
+     677/     288 : A2                  	LD R2			; ACC = shift count
+     678/     289 : 53 68               	JMS SHIFT_FRACTION_LEFT_P0_ACC
+     679/     28B :                     
+     680/     28B : DF                  	LDM 15			; check most significant digit
+     681/     28C : B1                  	XCH R1			; and shift to right if it is not zero
+     682/     28D : 21                  	SRC P0
+     683/     28E : E9                  	RDM
+     684/     28F : 14 99               	JCN Z, NM_EXIT
+     685/     291 : EC                  	RD0			; increment exponent
+     686/     292 : F2                  	IAC
+     687/     293 : E4                  	WR0
+     688/     294 : 1A 98               	JCN CN, NM_NOERROR
+     689/     296 : D1                  	LDM REG_ERROR_OVERFLOW
+     690/     297 : E6                  	WR2	;; set overflow flag
+     691/     298 :                     NM_NOERROR:
+     692/     298 : D1                  	LDM 1
+     693/     299 :                     NM_EXIT:
+     694/     299 : 43 44               	JUN SHIFT_FRACTION_RIGHT_P0_ACC
+     695/     29B :                     	
+     696/     29B :                     ;;;---------------------------------------------------------------------------
+     697/     29B :                     ;;; CMDC_MUL
+     698/     29B :                     ;;; X = X * Y
+     699/     29B :                     ;;;---------------------------------------------------------------------------
+     700/     29B :                     	
+     701/     29B :                     CMDC_MUL:
+     702/     29B : 56 53               	JMS PRINT_CRLF
+     703/     29D :                     
+     704/     29D : 20 00               	FIM P0, REG_X
+     705/     29F : 53 CD               	JMS ISZERO_REGISTER_P0
+     706/     2A1 : 1C C1               	JCN ZN, CMDC_MUL_ZERO
+     707/     2A3 :                     
+     708/     2A3 : 20 10               	FIM P0, REG_Y
+     709/     2A5 : 53 CD               	JMS ISZERO_REGISTER_P0
+     710/     2A7 : 1C C1               	JCN ZN, CMDC_MUL_ZERO
+     711/     2A9 :                     	
+     712/     2A9 : 2C 00               	FIM P6, REG_X
+     713/     2AB : 2E 10               	FIM P7, REG_Y
+     714/     2AD :                     
+     715/     2AD : 54 87               	JMS GET_SIGN_PRODUCT_P6_P7
+     716/     2AF : 2D                  	SRC P6
+     717/     2B0 : E5                  	WR1
+     718/     2B1 :                     	
+     719/     2B1 :                     	;;  calculate exponent of the result
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 14 - 2023/02/15 10:39:25
+
+
+     720/     2B1 : EC                  	RD0
+     721/     2B2 : B0                  	XCH R0
+     722/     2B3 : 2F                  	SRC P7
+     723/     2B4 : EC                  	RD0
+     724/     2B5 : F1                  	CLC
+     725/     2B6 : 80                  	ADD R0
+     726/     2B7 : 2D                  	SRC P6
+     727/     2B8 : E4                  	WR0			; set exp X (tentative)
+     728/     2B9 :                     				; it may be adjusted by the normalization
+     729/     2B9 : 1A BD               	JCN CN, CMDC_MUL_L0	; check overflow
+     730/     2BB : D1                  	LDM REG_ERROR_OVERFLOW
+     731/     2BC : E6                  	WR2			; set overflow flag
+     732/     2BD :                     CMDC_MUL_L0:
+     733/     2BD :                     	;; 	LDM 0
+     734/     2BD :                     	;; 	SRC P7
+     735/     2BD :                     	;; 	WR0			; exp Y = 0 (can be omitted)
+     736/     2BD :                     
+     737/     2BD :                     	; multiply fraction X = X * Y
+     738/     2BD : 53 00               	JMS MUL_FRACTION_XY
+     739/     2BF :                     
+     740/     2BF :                     CMDC_MUL_EXIT:
+     741/     2BF : 42 3F               	JUN CMDC_NORMALIZE_AND_EXIT
+     742/     2C1 :                     CMDC_MUL_ZERO:
+     743/     2C1 : 20 00               	FIM P0, REG_X
+     744/     2C3 : 53 A9               	JMS CLEAR_REGISTER_P0
+     745/     2C5 : 42 BF               	JUN CMDC_MUL_EXIT
+     746/     2C7 :                     
+     747/     300 :                     	org 0300H
+     748/     300 :                     ;;;---------------------------------------------------------------------------
+     749/     300 :                     ;;; MUL_FRACTION_XY
+     750/     300 :                     ;;; multiply fraction of REG_X and REG_Y
+     751/     300 :                     ;;; REG_X = REG_X* REG_Y
+     752/     300 :                     ;;; working: P6, P7, P5, P0(for shift), P1(for shift), P4(R8, R9)
+     753/     300 :                     ;;;---------------------------------------------------------------------------
+     754/     300 :                     ;;; D15=0 (number is normalized)
+     755/     300 :                     ;;; sum up folloings and store to FRA_X
+     756/     300 :                     ;;; FRA_Y
+     757/     300 :                     ;;; 0EDCBA9876543210 * 0 FRA_M(=FRA_X)
+     758/     300 :                     ;;;  0EDCBA987654321 * E
+     759/     300 :                     ;;;   0EDCBA98765432 * D
+     760/     300 :                     ;;;    0EDCBA9876543 * C
+     761/     300 :                     ;;;     0EDCBA987654 * B
+     762/     300 :                     ;;;      0EDCBA98765 * A
+     763/     300 :                     ;;;       0EDCBA9876 * 9
+     764/     300 :                     ;;;        0EDCBA987 * 8
+     765/     300 :                     ;;;         0EDCBA98 * 7
+     766/     300 :                     ;;;          0EDCBA9 * 6
+     767/     300 :                     ;;;           0EDCBA * 5
+     768/     300 :                     ;;;            0EDCB * 4
+     769/     300 :                     ;;;             0EDC * 3
+     770/     300 :                     ;;;              0ED * 2
+     771/     300 :                     ;;;               0E * 1
+     772/     300 :                     ;;;                0 * 0
+     773/     300 :                     ;;;---------------------------------------------------------------------------
+     774/     300 :                     MUL_FRACTION_XY:
+     775/     300 : 2C 40               	FIM P6, REG_M
+     776/     302 : 2E 00               	FIM P7, REG_X
+     777/     304 : 53 C5               	JMS LD_FRACTION_P6_P7	; FRA_M <= FRA_X
+     778/     306 :                     
+     779/     306 : 20 00               	FIM P0, REG_X
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 15 - 2023/02/15 10:39:25
+
+
+     780/     308 : 53 AF               	JMS CLEAR_FRACTION_P0	; FRA_X = 0, status(sign, exp) is reserved
+     781/     30A :                     	
+     782/     30A : 2A 40               	FIM P5, REG_M		; for mult loop (copy of X)
+     783/     30C : 2C 00               	FIM P6, REG_X		; for ADD (total)
+     784/     30E : 2E 10               	FIM P7, REG_Y		; for ADD
+     785/     310 : 20 10               	FIM P0, REG_Y		; for SHIFT (working reg. P1)
+     786/     312 :                     
+     787/     312 : F0                  	CLB
+     788/     313 : B8                  	XCH R8
+     789/     314 :                     MUL_LOOP:			; for i(R8)=0 to 15
+     790/     314 : A8                  	LD R8
+     791/     315 : F4                  	CMA
+     792/     316 : BB                  	XCH R11			; R11 = 15, 14, ..., 0
+     793/     317 : 2B                  	SRC P5
+     794/     318 : E9                  	RDM
+     795/     319 : 14 22               	JCN Z, MUL_LOOP_NEXT	; next if (REG_Y)[15-i] == 0
+     796/     31B : F4                  	CMA
+     797/     31C : F2                  	IAC
+     798/     31D : B9                  	XCH R9			; R9 = 16-(REG_Y)[15-i]
+     799/     31E :                     MUL_ADD_LOOP:			; add FRA_M to FRA_X '(REG_Y)[15-i] times'
+     800/     31E : 52 49               	JMS ADD_FRACTION_P6_P7
+     801/     320 : 79 1E               	ISZ R9, MUL_ADD_LOOP
+     802/     322 :                     MUL_LOOP_NEXT:
+     803/     322 : D1                  	LDM 1
+     804/     323 : 20 10               	FIM P0, REG_Y
+     805/     325 : 53 44               	JMS SHIFT_FRACTION_RIGHT_P0_ACC ; shift FRA_Y 1 digit right
+     806/     327 : 78 14               	ISZ R8, MUL_LOOP
+     807/     329 :                     
+     808/     329 : C0                  	BBL 0
+     809/     32A :                     	
+     810/     32A :                     ;;;---------------------------------------------------------------------------
+     811/     32A :                     ;;; CMDC_PRINT
+     812/     32A :                     ;;; Print X and Y
+     813/     32A :                     ;;;---------------------------------------------------------------------------
+     814/     32A :                     CMDC_PRINT:
+     815/     32A : 20 00               	FIM P0, REG_X
+     816/     32C : 54 92               	JMS PRINT_REGISTER_P0
+     817/     32E : 20 10               	FIM P0, REG_Y
+     818/     330 : 54 92               	JMS PRINT_REGISTER_P0
+     819/     332 : 41 0A               	JUN CMDC_LOOP_NUMIN
+     820/     334 :                     
+     821/     334 :                     ;;;---------------------------------------------------------------------------
+     822/     334 :                     ;;; PRINT_RESULT_AND_ENTER_TO_Y
+     823/     334 :                     ;;; Print REG_X as a result and ENTER to REG_Y
+     824/     334 :                     ;;;---------------------------------------------------------------------------
+     825/     334 :                     PRINT_RESULT_AND_ENTER_TO_Y:
+     826/     334 : 20 00               	FIM P0, REG_X
+     827/     336 : 2C 10               	FIM P6, REG_Y
+     828/     338 : 2E 00               	FIM P7, REG_X
+     829/     33A : 53 B5               	JMS LD_REGISTER_P6_P7	; Y<=X
+     830/     33C : 54 92               	JMS PRINT_REGISTER_P0
+     831/     33E : 41 0A               	JUN CMDC_LOOP_NUMIN
+     832/     340 :                     	
+     833/     340 :                     ;;;---------------------------------------------------------------------------
+     834/     340 :                     ;;; CMDC_SUB
+     835/     340 :                     ;;; X = Y - X
+     836/     340 :                     ;;;---------------------------------------------------------------------------
+     837/     340 :                     CMDC_SUB:
+     838/     340 : 53 D7               	JMS CHANGE_SIGN_REG_X
+     839/     342 : 42 00               	JUN CMDC_ADD
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 16 - 2023/02/15 10:39:25
+
+
+     840/     344 :                     	
+     841/     344 :                     ;;;---------------------------------------------------------------------------
+     842/     344 :                     ;;; SHIFT_FRACTION_RIGHT_P0_ACC
+     843/     344 :                     ;;; shift fraction of the register to right with filling 0
+     844/     344 :                     ;;; input: P0(=D3D2D1D0.xxxx (D3D2=#CHIP, D1D0=#REG)
+     845/     344 :                     ;;; 	   ACC=shift count
+     846/     344 :                     ;;; working: P0(R0, R1), P1(R2, R3)
+     847/     344 :                     ;;; destroy P1(R2, R3), R1 becomes 0 but R0 is not affected
+     848/     344 :                     ;;;---------------------------------------------------------------------------
+     849/     344 :                     SHIFT_FRACTION_RIGHT_P0_ACC:
+     850/     344 : 14 59               	JCN Z, SHIFTR_EXIT	; exit if ACC==0
+     851/     346 : B3                  	XCH R3			; R3 = ACC = shift
+     852/     347 : A0                  	LD R0
+     853/     348 : B2                  	XCH R2			; R2 = R0
+     854/     349 :                     
+     855/     349 : F0                  	CLB			; clear ACC and CY
+     856/     34A : B1                  	XCH R1			; R1=0
+     857/     34B :                     SHIFTR_LOOP:			; for(i=0 to 15) P0(REG(i))=P1(REG(i+shift))
+     858/     34B : D0                  	LDM 0
+     859/     34C : 12 50               	JCN C, SHIFTR_WRITE
+     860/     34E :                     SHIFTR_READ:	
+     861/     34E : 23                  	SRC P1
+     862/     34F : E9                  	RDM
+     863/     350 :                     SHIFTR_WRITE:
+     864/     350 : 21                  	SRC P0
+     865/     351 : E0                  	WRM
+     866/     352 : 63                  	INC R3
+     867/     353 : A3                  	LD R3
+     868/     354 : 1C 57               	JCN ZN, SHIFTR_NEXT      ; check if shift completed
+     869/     356 : FA                  	STC			; set flag to fill remaining bits with 0 
+     870/     357 :                     SHIFTR_NEXT:
+     871/     357 : 71 4B               	ISZ R1, SHIFTR_LOOP
+     872/     359 :                     SHIFTR_EXIT:
+     873/     359 : C0                  	BBL 0
+     874/     35A :                     
+     875/     35A :                     ;;;---------------------------------------------------------------------------
+     876/     35A :                     ;;; ISNUM_P1
+     877/     35A :                     ;;; check P1 '0' to '9' as a ascii character
+     878/     35A :                     ;;; return: ACC=0 if P1 is not a number
+     879/     35A :                     ;;;         ACC=1 if P1 is a number
+     880/     35A :                     ;;; destroy: P0
+     881/     35A :                     ;;;---------------------------------------------------------------------------
+     882/     35A :                     ISNUM_P1:
+     883/     35A : 20 2F               	FIM P0, '0'-1
+     884/     35C : 50 8E               	JMS CMP_P0P1
+     885/     35E : 12 67               	JCN C, ISNUM_FALSE	; '0'-1 >= P1
+     886/     360 : 20 39               	FIM P0, '9'
+     887/     362 : 50 8E               	JMS CMP_P0P1
+     888/     364 : 1A 67               	JCN CN, ISNUM_FALSE	; '9' < P1
+     889/     366 : C1                  	BBL 1			; P1 is a number
+     890/     367 :                     ISNUM_FALSE:
+     891/     367 : C0                  	BBL 0			; P1 is not a number
+     892/     368 :                     	
+     893/     368 :                     ;;;---------------------------------------------------------------------------
+     894/     368 :                     ;;; SHIFT_FRACTION_LEFT_P0_ACC
+     895/     368 :                     ;;; shift fraction of the register to left with filling 0
+     896/     368 :                     ;;; input: P0(=D3D2D1D0.xxxx (D3D2=#CHIP, D1D0=#REG)
+     897/     368 :                     ;;; 	   ACC=shift count
+     898/     368 :                     ;;; working: P0(R0, R1), P1(R2, R3), P2(R4, R5), R15
+     899/     368 :                     ;;; destroy P1(R2, R3), P2, R15, R1 becomes 0 but R0 is not affected
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 17 - 2023/02/15 10:39:25
+
+
+     900/     368 :                     ;;;---------------------------------------------------------------------------
+     901/     368 :                     SHIFT_FRACTION_LEFT_P0_ACC:
+     902/     368 : 14 86               	JCN Z, SHIFTL_EXIT	; exit if ACC==0
+     903/     36A : B5                  	XCH R5			; R5 = ACC = shift
+     904/     36B : A0                  	LD R0
+     905/     36C : B2                  	XCH R2			; R2 = R0
+     906/     36D :                     
+     907/     36D : F0                  	CLB			; clear ACC and CY
+     908/     36E : B4                  	XCH R4			; R4=0 (R4=i, R5=i+shift)
+     909/     36F :                     SHIFTL_LOOP:			; for(i=0 to 15) P0(REG(~i))=P1(REG(~(i+shift))
+     910/     36F : D0                  	LDM 0
+     911/     370 : BF                  	XCH R15
+     912/     371 : 12 79               	JCN C, SHIFTL_WRITE
+     913/     373 :                     SHIFTL_READ:	
+     914/     373 : A5                  	LD R5
+     915/     374 : F4                  	CMA
+     916/     375 : B3                  	XCH R3			; R3 = ~R5 =~(i+shift)
+     917/     376 : 23                  	SRC P1
+     918/     377 : E9                  	RDM
+     919/     378 : BF                  	XCH R15
+     920/     379 :                     SHIFTL_WRITE:
+     921/     379 : A4                  	LD R4
+     922/     37A : F4                  	CMA
+     923/     37B : B1                  	XCH R1			; R1 = ~R4 =~i
+     924/     37C : 21                  	SRC P0
+     925/     37D : BF                  	XCH R15
+     926/     37E : E0                  	WRM
+     927/     37F : 65                  	INC R5
+     928/     380 : A5                  	LD R5
+     929/     381 : 1C 84               	JCN ZN, SHIFTL_NEXT	; check if shift completed
+     930/     383 : FA                  	STC			; set flag to fill remaining bits with 0 
+     931/     384 :                     SHIFTL_NEXT:
+     932/     384 : 74 6F               	ISZ R4, SHIFTL_LOOP
+     933/     386 :                     SHIFTL_EXIT:
+     934/     386 : C0                  	BBL 0
+     935/     387 :                     	
+     936/     387 :                     ;;;---------------------------------------------------------------------------
+     937/     387 :                     ;;; ALIGN_REGISTER_XY
+     938/     387 :                     ;;; align digit point to larger register
+     939/     387 :                     ;;; input: P6(=D3D2D1D0.0000 (D3D2=#CHIP, D1D0=#REG)
+     940/     387 :                     ;;;        P7(=D3D2D1D0.0000 (D3D2=#CHIP, D1D0=#REG)
+     941/     387 :                     ;;; working: R10, R11
+     942/     387 :                     ;;;---------------------------------------------------------------------------
+     943/     387 :                     ALIGN_REGISTER_XY:
+     944/     387 : 2C 00               	FIM P6, REG_X
+     945/     389 : 2E 10               	FIM P7, REG_Y
+     946/     38B : 2D                  	SRC P6
+     947/     38C : EC                  	RD0
+     948/     38D : BA                  	XCH R10			; R10 = expoenent of REG_P6
+     949/     38E : 2F                  	SRC P7
+     950/     38F : EC                  	RD0 
+     951/     390 : BB                  	XCH R11			; R11 = expoenent of REG_P7
+     952/     391 :                     
+     953/     391 : AB                  	LD R11
+     954/     392 : F1                  	CLC
+     955/     393 : 9A                  	SUB R10
+     956/     394 : 12 A1               	JCN C, EY_GE_EX		; R11 >= R10
+     957/     396 :                     	;; R11 < R10
+     958/     396 : F4                  	CMA
+     959/     397 : F2                  	IAC
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 18 - 2023/02/15 10:39:25
+
+
+     960/     398 : 20 10               	FIM P0, REG_Y
+     961/     39A : 53 44               	JMS SHIFT_FRACTION_RIGHT_P0_ACC
+     962/     39C : AA                  	LD R10
+     963/     39D : 2F                  	SRC P7
+     964/     39E : E4                  	WR0
+     965/     39F : 43 A8               	JUN ALIGN_EXIT
+     966/     3A1 :                     EY_GE_EX:
+     967/     3A1 : 20 00               	FIM P0, REG_X
+     968/     3A3 : 53 44               	JMS SHIFT_FRACTION_RIGHT_P0_ACC
+     969/     3A5 : AB                  	LD R11
+     970/     3A6 : 2D                  	SRC P6
+     971/     3A7 : E4                  	WR0
+     972/     3A8 :                     ALIGN_EXIT:
+     973/     3A8 : C0                  	BBL 0
+     974/     3A9 :                     	
+     975/     3A9 :                     ;;;---------------------------------------------------------------------------
+     976/     3A9 :                     ;;; CLEAR_REGISTER_P0
+     977/     3A9 :                     ;;; Clear register
+     978/     3A9 :                     ;;; input: P7(=D3D2D1D0.0000 (D3D2=#CHIP, D1D0=#REG))
+     979/     3A9 :                     ;;; output: ACC=0, R1=0, (R0 is not affected)
+     980/     3A9 :                     ;;;---------------------------------------------------------------------------
+     981/     3A9 :                     CLEAR_REGISTER_P0:
+     982/     3A9 : F0                  	CLB
+     983/     3AA : 21                  	SRC P0
+     984/     3AB : E4                  	WR0
+     985/     3AC : E5                  	WR1
+     986/     3AD : E6                  	WR2
+     987/     3AE : E7                  	WR3
+     988/     3AF :                     ;;;---------------------------------------------------------------------------
+     989/     3AF :                     ;;; CLEAR_FRACTION_P0
+     990/     3AF :                     ;;;---------------------------------------------------------------------------
+     991/     3AF :                     CLEAR_FRACTION_P0:
+     992/     3AF : F0                  	CLB
+     993/     3B0 :                     CLEAR_REGISTER_L0:
+     994/     3B0 : 21                  	SRC P0
+     995/     3B1 : E0                  	WRM
+     996/     3B2 : 71 B0               	ISZ R1, CLEAR_REGISTER_L0
+     997/     3B4 : C0                  	BBL 0
+     998/     3B5 :                     
+     999/     3B5 :                     ;;;---------------------------------------------------------------------------
+    1000/     3B5 :                     ;;; LD_REGISTER_P6_P7
+    1001/     3B5 :                     ;;; load register REG(P7) to REG(P6) (REG_P6 <= REG_P7)
+    1002/     3B5 :                     ;;; input: P6(=D3D2D1D0.0000 (D3D2=#CHIP, D1D0=#REG)) 
+    1003/     3B5 :                     ;;;        P7(=D3D2D1D0.0000 (D3D2=#CHIP, D1D0=#REG))
+    1004/     3B5 :                     ;;; output: ACC=0, R13=0, R15=0
+    1005/     3B5 :                     ;;; destroy R13, R15 (R12 and R14 are not affected)
+    1006/     3B5 :                     ;;;---------------------------------------------------------------------------
+    1007/     3B5 :                     LD_REGISTER_P6_P7:
+    1008/     3B5 :                     	;; copy status characters
+    1009/     3B5 : 2F                  	SRC P7
+    1010/     3B6 : EC                  	RD0
+    1011/     3B7 : 2D                  	SRC P6
+    1012/     3B8 : E4                  	WR0
+    1013/     3B9 :                     
+    1014/     3B9 : 2F                  	SRC P7
+    1015/     3BA : ED                  	RD1
+    1016/     3BB : 2D                  	SRC P6
+    1017/     3BC : E5                  	WR1
+    1018/     3BD :                     
+    1019/     3BD : 2F                  	SRC P7
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 19 - 2023/02/15 10:39:25
+
+
+    1020/     3BE : EE                  	RD2
+    1021/     3BF : 2D                  	SRC P6
+    1022/     3C0 : E6                  	WR2
+    1023/     3C1 :                     
+    1024/     3C1 : 2F                  	SRC P7
+    1025/     3C2 : EF                  	RD3
+    1026/     3C3 : 2D                  	SRC P6
+    1027/     3C4 : E7                  	WR3
+    1028/     3C5 :                     ;;;---------------------------------------------------------------------------
+    1029/     3C5 :                     ;;; LD_FRACTION_P6_P7
+    1030/     3C5 :                     ;;;---------------------------------------------------------------------------
+    1031/     3C5 :                     LD_FRACTION_P6_P7
+    1032/     3C5 :                     	; CLB
+    1033/     3C5 :                     	; XCH R13			; clear R13
+    1034/     3C5 :                     	; CLB
+    1035/     3C5 :                     	; XCH R15			; clear R15
+    1036/     3C5 :                     LD_FRACTION_L0:
+    1037/     3C5 : 2F                  	SRC P7
+    1038/     3C6 : E9                  	RDM			; read a digit from the source register
+    1039/     3C7 : 2D                  	SRC P6
+    1040/     3C8 : E0                  	WRM			; write the digit to memory
+    1041/     3C9 : 6D                  	INC R13
+    1042/     3CA : 7F C5               	ISZ R15, LD_FRACTION_L0
+    1043/     3CC :                     
+    1044/     3CC : C0                  	BBL 0
+    1045/     3CD :                     
+    1046/     3CD :                     ;;;---------------------------------------------------------------------------
+    1047/     3CD :                     ;;; ISZERO_REGISTER_P0
+    1048/     3CD :                     ;;; check if REG(P0) == 0 or not
+    1049/     3CD :                     ;;; return: ACC = (REG==0) ? 1 : 0;
+    1050/     3CD :                     ;;; destroy: R1 (R0 is not affected)
+    1051/     3CD :                     ;;;---------------------------------------------------------------------------
+    1052/     3CD :                     ISZERO_REGISTER_P0:
+    1053/     3CD : F0                  	CLB
+    1054/     3CE : B1                  	XCH R1
+    1055/     3CF :                     ISZERO_LOOP:
+    1056/     3CF : 21                  	SRC P0
+    1057/     3D0 : E9                  	RDM
+    1058/     3D1 : 1C D6               	JCN ZN, ISZERO_EXIT0
+    1059/     3D3 : 71 CF               	ISZ R1, ISZERO_LOOP
+    1060/     3D5 :                     
+    1061/     3D5 : C1                  	BBL 1
+    1062/     3D6 :                     ISZERO_EXIT0:
+    1063/     3D6 : C0                  	BBL 0
+    1064/     3D7 :                     	
+    1065/     3D7 :                     ;;;---------------------------------------------------------------------------
+    1066/     3D7 :                     ;;; CHANGE_SIGN_REG_X
+    1067/     3D7 :                     ;;; X = -X
+    1068/     3D7 :                     ;;; destroy: P7
+    1069/     3D7 :                     ;;;---------------------------------------------------------------------------
+    1070/     3D7 :                     CHANGE_SIGN_REG_X:
+    1071/     3D7 : 2E 00               	FIM P7, REG_X
+    1072/     3D9 : 2F                  	SRC P7
+    1073/     3DA : ED                  	RD1
+    1074/     3DB : F4                  	CMA
+    1075/     3DC : E5                  	WR1
+    1076/     3DD : C0                  	BBL 0
+    1077/     3DE :                     
+    1078/     400 :                     	org 0400H
+    1079/     400 :                     ;;;---------------------------------------------------------------------------
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 20 - 2023/02/15 10:39:25
+
+
+    1080/     400 :                     ;;; CMDC_DIV
+    1081/     400 :                     ;;; X = Y / X
+    1082/     400 :                     ;;;---------------------------------------------------------------------------
+    1083/     400 :                     CMDC_DIV:
+    1084/     400 : 56 53               	JMS PRINT_CRLF
+    1085/     402 :                     
+    1086/     402 : 20 00               	FIM P0, REG_X
+    1087/     404 : 52 72               	JMS NORMALIZE_REGISTER_P0
+    1088/     406 : 53 CD               	JMS ISZERO_REGISTER_P0
+    1089/     408 : 1C 46               	JCN ZN, CMDC_DIV_BY_ZERO
+    1090/     40A :                     
+    1091/     40A : 20 10               	FIM P0, REG_Y
+    1092/     40C : 53 CD               	JMS ISZERO_REGISTER_P0
+    1093/     40E : 1C 4D               	JCN ZN, CMDC_DIVIDEND_ZERO
+    1094/     410 :                     	
+    1095/     410 : 2C 00               	FIM P6, REG_X
+    1096/     412 : 2E 10               	FIM P7, REG_Y
+    1097/     414 :                     
+    1098/     414 : 54 87               	JMS GET_SIGN_PRODUCT_P6_P7
+    1099/     416 : 2F                  	SRC P7
+    1100/     417 : E5                  	WR1			; save sign to Y
+    1101/     418 :                     	
+    1102/     418 :                     	;; if devisor(REG_X) is less than 0.1,
+    1103/     418 :                     	;; shift it left until it become equal or larger than 0.1
+    1104/     418 :                     	;; and increment the exponent of devidend
+    1105/     418 :                     	;; example
+    1106/     418 :                     	;; X=0.0001 -> X=0.1000, exponent of Y += 3
+    1107/     418 : 2D                  	SRC P6
+    1108/     419 : EC                  	RD0			; check exponent of REG_X(devisor)
+    1109/     41A : 1C 2F               	JCN ZN, DIV_FRAC_ADJ_EXP
+    1110/     41C :                     DIV_LOOP_D14:
+    1111/     41C :                     	;; increment exponent of Y
+    1112/     41C : 2F                  	SRC P7			; Y
+    1113/     41D : EC                  	RD0
+    1114/     41E : F2                  	IAC
+    1115/     41F : E4                  	WR0			; EXP(Y)++
+    1116/     420 : 1A 24               	JCN NC, DIV_LOOP_L0
+    1117/     422 : D1                  	LDM REG_ERROR_OVERFLOW
+    1118/     423 : E6                  	WR2			; set overflow flag, but continue calculation
+    1119/     424 :                     DIV_LOOP_L0:
+    1120/     424 : DE                  	LDM 14
+    1121/     425 : BD                  	XCH R13
+    1122/     426 : 2D                  	SRC P6			; X
+    1123/     427 : E9                  	RDM			; ACC = D14 of X
+    1124/     428 : 1C 42               	JCN ZN, DIV_FRAC        ; exit loop and continue calculation
+    1125/     42A : D1                  	LDM 1
+    1126/     42B : 53 68               	JMS SHIFT_FRACTION_LEFT_P0_ACC
+    1127/     42D : 44 1C               	JUN DIV_LOOP_D14
+    1128/     42F :                     
+    1129/     42F :                     	; adjust exponent of Y
+    1130/     42F :                     DIV_FRAC_ADJ_EXP:
+    1131/     42F : 2D                  	SRC P6			; X
+    1132/     430 : EC                  	RD0
+    1133/     431 : F8                   	DAC
+    1134/     432 : B0                  	XCH R0			; R0 = (exponent of X)-1
+    1135/     433 : 2F                  	SRC P7
+    1136/     434 : EC                  	RD0
+    1137/     435 : F1                  	CLC
+    1138/     436 : 90                  	SUB R0			; exp(Y) - exp(X)
+    1139/     437 : E4                  	WR0
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 21 - 2023/02/15 10:39:25
+
+
+    1140/     438 : 12 42               	JCN C, DIV_FRAC		; no borrow
+    1141/     43A : F4                  	CMA
+    1142/     43B : F2                  	IAC
+    1143/     43C : 20 10               	FIM P0, REG_Y
+    1144/     43E : 53 44               	JMS SHIFT_FRACTION_RIGHT_P0_ACC ; shift frac(Y) and set exp(Y)=0
+    1145/     440 : F0                  	CLB
+    1146/     441 : E4                  	WR0
+    1147/     442 :                     DIV_FRAC:
+    1148/     442 : 54 53               	JMS DIV_FRACTION_XY
+    1149/     444 :                     	;; 	JUN DIV_FRACTION_XY
+    1150/     444 :                     	;; RETURN_DIV_FRACTION_XY:	
+    1151/     444 :                     	; normalize REG_X and clear REG_Y
+    1152/     444 : 42 3F               	JUN CMDC_NORMALIZE_AND_EXIT
+    1153/     446 :                     	
+    1154/     446 :                     CMDC_DIV_BY_ZERO:
+    1155/     446 : 20 00               	FIM P0, REG_X
+    1156/     448 : 21                  	SRC P0
+    1157/     449 : D2                  	LDM REG_ERROR_DIVBYZERO
+    1158/     44A : E6                  	WR2			; set error flag
+    1159/     44B : 41 06               	JUN CMDC_LOOP_START
+    1160/     44D :                     CMDC_DIVIDEND_ZERO:
+    1161/     44D : 20 00               	FIM P0, REG_X
+    1162/     44F : 53 A9               	JMS CLEAR_REGISTER_P0
+    1163/     451 : 41 06               	JUN CMDC_LOOP_START
+    1164/     453 :                     	
+    1165/     453 :                     ;;;---------------------------------------------------------------------------
+    1166/     453 :                     ;;; DIV_FRACTION_XY
+    1167/     453 :                     ;;; FRAC(X) = FRAC(Y) / FRAC(X)
+    1168/     453 :                     ;;; working: P6, P7, P5, P0(for shift), P1 (for shift), P4(R8, R9)
+    1169/     453 :                     ;;;---------------------------------------------------------------------------
+    1170/     453 :                     ;;;  compare and subtract and count, and shift
+    1171/     453 :                     ;;; 
+    1172/     453 :                     ;;;  0EDCBA9876543210
+    1173/     453 :                     ;;;  0edcba9876543210 -> E
+    1174/     453 :                     ;;;
+    1175/     453 :                     ;;;  0EDCBA9876543210
+    1176/     453 :                     ;;;   0edcba987654321 -> D
+    1177/     453 :                     ;;; 
+    1178/     453 :                     ;;;  0EDCBA9876543210
+    1179/     453 :                     ;;;    0edcba98765432 -> C
+    1180/     453 :                     ;;; ...
+    1181/     453 :                     ;;;  0EDCBA9876543210 -> 0
+    1182/     453 :                     ;;;                0e
+    1183/     453 :                     ;;;
+    1184/     453 :                     ;;; e!=0
+    1185/     453 :                     ;;;---------------------------------------------------------------------------
+    1186/     453 :                     	
+    1187/     453 :                     DIV_FRACTION_XY:
+    1188/     453 : 2C 10               	FIM P6, REG_Y
+    1189/     455 : 2E 00               	FIM P7, REG_X
+    1190/     457 : 2A 40               	FIM P5, REG_M
+    1191/     459 :                     
+    1192/     459 : 20 40               	FIM P0, REG_M
+    1193/     45B : 53 AF               	JMS CLEAR_FRACTION_P0
+    1194/     45D :                     
+    1195/     45D : D1                  	LDM 1
+    1196/     45E : B8                  	XCH R8			; for i(R8)= 1 to 15;
+    1197/     45F :                     DIV_LOOP:	
+    1198/     45F : F0                  	CLB
+    1199/     460 : B9                  	XCH R9			; counter R9 = 0
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 22 - 2023/02/15 10:39:25
+
+
+    1200/     461 :                     DIV_SUB_COUNT:
+    1201/     461 : 52 58               	JMS CMP_FRACTION_P6_P7	   ; Compare Y with X
+    1202/     463 : 1A 6F               	JCN CN, DIV_SUB_COUNT_EXIT ; jump if REG_Y < REG_X
+    1203/     465 :                     
+    1204/     465 :                     	;; check R9 is already 9
+    1205/     465 :                     	;; it occurs when shifted divisor is truncated
+    1206/     465 :                     	;; (ex. previous loop 100/109 -> this loop 100/10)
+    1207/     465 : D9                  	LDM 9
+    1208/     466 : F1                  	CLC
+    1209/     467 : 99                  	SUB R9
+    1210/     468 : 14 6F               	JCN Z, DIV_SUB_COUNT_EXIT
+    1211/     46A :                     	
+    1212/     46A : 51 E5               	JMS SUB_FRACTION_P6_P7	   ; Y = Y - X
+    1213/     46C : 69                  	INC R9
+    1214/     46D : 44 61               	JUN DIV_SUB_COUNT
+    1215/     46F :                     DIV_SUB_COUNT_EXIT:	
+    1216/     46F : A8                  	LD R8
+    1217/     470 : F4                  	CMA
+    1218/     471 : BB                  	XCH R11			; R11 = 14, 13, ..., 0
+    1219/     472 : 2B                  	SRC P5			; REG_M
+    1220/     473 : A9                  	LD R9
+    1221/     474 : E0                  	WRM			; REG_M(R11) = R9
+    1222/     475 : D1                  	LDM 1
+    1223/     476 : 20 00               	FIM P0, REG_X
+    1224/     478 : 53 44               	JMS SHIFT_FRACTION_RIGHT_P0_ACC ; X=X/10
+    1225/     47A :                     
+    1226/     47A : 78 5F               	ISZ R8, DIV_LOOP
+    1227/     47C :                     
+    1228/     47C : 2C 00               	FIM P6, REG_X
+    1229/     47E : 2E 10               	FIM P7, REG_Y
+    1230/     480 : 53 B5               	JMS LD_REGISTER_P6_P7	; copy exponent of Y to X
+    1231/     482 : 2E 40               	FIM P7, REG_M
+    1232/     484 : 53 C5               	JMS LD_FRACTION_P6_P7	; copy fraction of M to X
+    1233/     486 :                     				; X need to be normalized
+    1234/     486 : C0                  	BBL 0
+    1235/     487 :                     	;; 	JUN RETURN_DIV_FRACTION_XY
+    1236/     487 :                     
+    1237/     487 :                     ;;;---------------------------------------------------------------------------
+    1238/     487 :                     ;;; GET_SIGN_PRODUCT_P6_P7
+    1239/     487 :                     ;;; calculate sign of the result for multiplication and division
+    1240/     487 :                     ;;; result: ACC=0 (+) if REG(P6) and REG(P7) have the same sign (++or--)
+    1241/     487 :                     ;;;            =15(-) if REG(P6) and REG(P7) have the different signs (+-or-+)
+    1242/     487 :                     ;;; destroy: R0
+    1243/     487 :                     ;;;---------------------------------------------------------------------------
+    1244/     487 :                     GET_SIGN_PRODUCT_P6_P7:	
+    1245/     487 :                     	;;  calculate sign of the result for multiplication and division
+    1246/     487 : 2D                  	SRC P6			; check sign of REG_X and REG_Y same or not
+    1247/     488 : ED                  	RD1
+    1248/     489 : B0                  	XCH R0			; R0 = sign of X
+    1249/     48A : 2F                  	SRC P7
+    1250/     48B : ED                  	RD1			; sign of Y
+    1251/     48C : F1                  	CLC
+    1252/     48D : 90                  	SUB R0
+    1253/     48E : 14 91                	JCN Z, GET_SIGN_EXIT
+    1254/     490 : CF                  	BBL 15			; negative sign
+    1255/     491 :                     GET_SIGN_EXIT:
+    1256/     491 : C0                  	BBL 0
+    1257/     492 :                     
+    1258/     492 :                     ;;;---------------------------------------------------------------------------
+    1259/     492 :                     ;;; PRINT_REGISTER_P0
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 23 - 2023/02/15 10:39:25
+
+
+    1260/     492 :                     ;;; Print the contents of the number register
+    1261/     492 :                     ;;; input: P0(R0=D3D2D1D0 (D3D2=#CHIP, D1D0=#REG))
+    1262/     492 :                     ;;; destroy P6, P7, P5(R10, R11), P1
+    1263/     492 :                     ;;; output: ACC=0
+    1264/     492 :                     ;;;---------------------------------------------------------------------------
+    1265/     492 :                     PRINT_REGISTER_P0:
+    1266/     492 :                     	;; 	FIM P1, 'X'
+    1267/     492 :                     	;; 	JMS PUTCHAR_P1
+    1268/     492 :                     	;; 	LD R0
+    1269/     492 :                     	;; 	JMS PRINT_ACC
+    1270/     492 :                     	;;
+    1271/     492 : 22 3D               	FIM P1, '='
+    1272/     494 : 21                  	SRC P0
+    1273/     495 : EE                  	RD2
+    1274/     496 : 14 9A               	JCN Z, PRINT_REGISTER_EQU_ERR
+    1275/     498 : 22 45               	FIM P1, 'E'
+    1276/     49A :                     PRINT_REGISTER_EQU_ERR
+    1277/     49A : 56 28               	JMS PUTCHAR_P1
+    1278/     49C :                     
+    1279/     49C : 22 2B               	FIM P1, '+'
+    1280/     49E : 21                  	SRC P0
+    1281/     49F : ED                  	RD1
+    1282/     4A0 : 14 A4               	JCN Z, PRINT_REGISTER_SGN
+    1283/     4A2 : 22 2D               	FIM P1, '-'
+    1284/     4A4 :                     PRINT_REGISTER_SGN:
+    1285/     4A4 : 56 28               	JMS PUTCHAR_P1
+    1286/     4A6 :                     	
+    1287/     4A6 : 21                  	SRC P0
+    1288/     4A7 : EC                  	RD0			
+    1289/     4A8 : BA                  	XCH R10                 ; load R10=exponent
+    1290/     4A9 :                     
+    1291/     4A9 :                     	;; print first digit(D15) if it is not zero
+    1292/     4A9 :                     	;; (it should be '0' if the number is normalized) 
+    1293/     4A9 : DF                  	LDM 15
+    1294/     4AA : B1                  	XCH R1
+    1295/     4AB : 21                  	SRC P0
+    1296/     4AC : E9                  	RDM
+    1297/     4AD : 14 B1               	JCN Z, PRINT_CHECK_EXP
+    1298/     4AF : 56 48               	JMS PRINT_ACC
+    1299/     4B1 :                     
+    1300/     4B1 :                     PRINT_CHECK_EXP:		; print digit point if exponent is 0
+    1301/     4B1 : AA                  	LD R10
+    1302/     4B2 : 1C B8               	JCN ZN, PRINT_REGISTER_LOOP_SETUP
+    1303/     4B4 : 22 2E               	FIM P1, '.'
+    1304/     4B6 : 56 28               	JMS PUTCHAR_P1
+    1305/     4B8 :                     
+    1306/     4B8 :                     PRINT_REGISTER_LOOP_SETUP:
+    1307/     4B8 : F0                  	CLB
+    1308/     4B9 : D1                  	LDM 1
+    1309/     4BA : BB                  	XCH R11			; R11 is loop counter start from 1
+    1310/     4BB :                     PRINT_REGISTER_LOOP:
+    1311/     4BB : DF                  	LDM 15
+    1312/     4BC : F1                  	CLC
+    1313/     4BD : 9B                  	SUB R11			; (R11 =  1, 2,...,15) 
+    1314/     4BE : 14 D0               	JCN Z, PRINT_EXIT	; skip last digit
+    1315/     4C0 : B1                  	XCH R1			; ( R1 = 14,13,..., 1)
+    1316/     4C1 : 21                  	SRC P0
+    1317/     4C2 : E9                  	RDM
+    1318/     4C3 : 56 48               	JMS PRINT_ACC
+    1319/     4C5 :                     
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 24 - 2023/02/15 10:39:25
+
+
+    1320/     4C5 : F0                  	CLB			; print digit point
+    1321/     4C6 : AA                  	LD R10
+    1322/     4C7 : 9B                  	SUB R11
+    1323/     4C8 : 1C CE               	JCN ZN, PRINT_REGISTER_L1
+    1324/     4CA : 22 2E               	FIM P1, '.'
+    1325/     4CC : 56 28               	JMS PUTCHAR_P1
+    1326/     4CE :                     PRINT_REGISTER_L1:
+    1327/     4CE : 7B BB               	ISZ R11, PRINT_REGISTER_LOOP
+    1328/     4D0 :                     PRINT_EXIT:	
+    1329/     4D0 : 56 53               	JMS PRINT_CRLF
+    1330/     4D2 : C0                  	BBL 0
+    1331/     4D3 :                     
+    1332/     4D3 :                     	
+    1333/     4D3 :                     ;;;---------------------------------------------------------------------------
+    1334/     4D3 :                     ;;; Monitor commands located in page 0500H
+    1335/     4D3 :                     ;;;---------------------------------------------------------------------------
+    1336/     500 :                     	org 0500H
+    1337/     500 :                     ;;;---------------------------------------------------------------------------
+    1338/     500 :                     ;;; Read Data RAM
+    1339/     500 :                     ;;; input:
+    1340/     500 :                     ;;; 	R10: #bank
+    1341/     500 :                     ;;; 	R11: #chip (D3.D2.0.0)
+    1342/     500 :                     ;;; working memory:
+    1343/     500 :                     ;;;     P0(R0R1): working for PRINT_P0
+    1344/     500 :                     ;;;     P1(R2R3): working for PUTCHAR_P1, PRINT_ACC
+    1345/     500 :                     ;;;     R4: loop counter for #REG (0.0.D1.D0)
+    1346/     500 :                     ;;;     R5: working for input
+    1347/     500 :                     ;;;     R6: working for SCR (R6=R11+R4)
+    1348/     500 :                     ;;;     R7: working for SCR #CHARACTER (D3.D2.D1.D0)@X3 (loop counter)
+    1349/     500 :                     ;;;         SCR R6R7
+    1350/     500 :                     ;;;     R8: not used
+    1351/     500 :                     ;;; 	R9: not used
+    1352/     500 :                     ;;; 	R11: #CHIP (D3.D2.0.0)@X2
+    1353/     500 :                     ;;;     P6(R12R13): working for uart
+    1354/     500 :                     ;;;     P7(R14R15): working for uart
+    1355/     500 :                     ;;;---------------------------------------------------------------------------
+    1356/     500 :                     COMMAND_R:
+    1357/     500 :                     	;; PRINT 4 registers
+    1358/     500 : DC                  	LDM loop(4)		; 4 regs
+    1359/     501 : B4                  	XCH R4			; R4=loop(4)
+    1360/     502 :                     
+    1361/     502 :                     	;; PRINT 16 characters
+    1362/     502 :                     CMDR_L1:
+    1363/     502 : D0                  	LDM loop(16)		; 16 characters
+    1364/     503 : B7                  	XCH R7			; R7=D3D2D1D0@X3 (#character)
+    1365/     504 :                     CMDR_L2:
+    1366/     504 : F0                  	CLB
+    1367/     505 : D4                  	LDM 4
+    1368/     506 : 84                  	ADD R4		;ACC<-#reg (D1D0@X2)(00, 01, 10, 11 for each loop)
+    1369/     507 : F1                  	CLC
+    1370/     508 : 8B                  	ADD R11
+    1371/     509 : B6                  	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
+    1372/     50A :                     	
+    1373/     50A : 27                  	SRC R6R7	; set address
+    1374/     50B : E9                  	RDM		; read data memory
+    1375/     50C : 56 48               	JMS PRINT_ACC
+    1376/     50E : 77 04               	ISZ R7,CMDR_L2
+    1377/     510 :                     
+    1378/     510 :                     	;; PRINT STATUS 
+    1379/     510 : 22 3A               	FIM P1, ':'
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 25 - 2023/02/15 10:39:25
+
+
+    1380/     512 : 56 28               	JMS PUTCHAR_P1
+    1381/     514 : 27                  	SRC R6R7	; set address
+    1382/     515 : EC                  	RD0
+    1383/     516 : 56 48               	JMS PRINT_ACC
+    1384/     518 : 27                  	SRC R6R7	; set address
+    1385/     519 : ED                  	RD1
+    1386/     51A : 56 48               	JMS PRINT_ACC
+    1387/     51C : 27                  	SRC R6R7	; set address
+    1388/     51D : EE                  	RD2
+    1389/     51E : 56 48               	JMS PRINT_ACC
+    1390/     520 : 27                  	SRC R6R7	; set address
+    1391/     521 : EF                  	RD3
+    1392/     522 : 56 48               	JMS PRINT_ACC
+    1393/     524 : 56 53               	JMS PRINT_CRLF
+    1394/     526 :                     
+    1395/     526 : 74 02               	ISZ R4,CMDR_L1
+    1396/     528 : 40 10               	JUN CMD_LOOP		; return to command loop
+    1397/     52A :                     	
+    1398/     52A :                     ;;;---------------------------------------------------------------------------
+    1399/     52A :                     ;;; Write Data RAM
+    1400/     52A :                     ;;; input:
+    1401/     52A :                     ;;; 	R10: #bank
+    1402/     52A :                     ;;; 	R11: #chip (D3.D2.0.0)
+    1403/     52A :                     ;;;---------------------------------------------------------------------------
+    1404/     52A :                     COMMAND_W:
+    1405/     52A :                     	;; PRINT 4 registers
+    1406/     52A : DC                  	LDM loop(4)		; 4 regs
+    1407/     52B : B4                  	XCH R4			; R4=loop(4)
+    1408/     52C :                     
+    1409/     52C :                     	;; PRINT 16 characters
+    1410/     52C :                     CMDW_L1:
+    1411/     52C : D0                  	LDM loop(16)		; 16 characters
+    1412/     52D : B7                  	XCH R7			; R7=D3D2D1D0@X3 (#character)
+    1413/     52E :                     CMDW_L2:
+    1414/     52E : F0                  	CLB
+    1415/     52F : D4                  	LDM 4
+    1416/     530 : 84                  	ADD R4		;ACC<-#reg (D1D0@X2)(00, 01, 10, 11 for each loop)
+    1417/     531 : F1                  	CLC
+    1418/     532 : 8B                  	ADD R11
+    1419/     533 : B6                  	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
+    1420/     534 :                     
+    1421/     534 : 56 00               	JMS GETCHAR_P1
+    1422/     536 : 56 62               	JMS CTOI_P1_R5
+    1423/     538 :                     
+    1424/     538 : 27                  	SRC R6R7	; set address
+    1425/     539 : A5                  	LD R5
+    1426/     53A : E0                  	WRM			; write to memory
+    1427/     53B : 56 48               	JMS PRINT_ACC
+    1428/     53D : 77 2E               	ISZ R7,CMDW_L2
+    1429/     53F :                     
+    1430/     53F :                     	;; PRINT STATUS 
+    1431/     53F : 22 3A               	FIM P1, ':'
+    1432/     541 : 56 28               	JMS PUTCHAR_P1
+    1433/     543 :                     
+    1434/     543 : 56 00               	JMS GETCHAR_P1
+    1435/     545 : 56 62               	JMS CTOI_P1_R5
+    1436/     547 :                     
+    1437/     547 : 27                  	SRC R6R7	; set address
+    1438/     548 : A5                  	LD R5
+    1439/     549 : E4                  	WR0
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 26 - 2023/02/15 10:39:25
+
+
+    1440/     54A : 56 48               	JMS PRINT_ACC
+    1441/     54C :                     
+    1442/     54C : 56 00               	JMS GETCHAR_P1
+    1443/     54E : 56 62               	JMS CTOI_P1_R5
+    1444/     550 :                     
+    1445/     550 : 27                  	SRC R6R7	; set address
+    1446/     551 : A5                  	LD R5
+    1447/     552 : E5                  	WR1
+    1448/     553 : 56 48               	JMS PRINT_ACC
+    1449/     555 :                     
+    1450/     555 : 56 00               	JMS GETCHAR_P1
+    1451/     557 : 56 62               	JMS CTOI_P1_R5
+    1452/     559 :                     
+    1453/     559 : 27                  	SRC R6R7	; set address
+    1454/     55A : A5                  	LD R5
+    1455/     55B : E6                  	WR2
+    1456/     55C : 56 48               	JMS PRINT_ACC
+    1457/     55E :                     
+    1458/     55E : 56 00               	JMS GETCHAR_P1
+    1459/     560 : 56 62               	JMS CTOI_P1_R5
+    1460/     562 :                     
+    1461/     562 : 27                  	SRC R6R7	; set address
+    1462/     563 : A5                  	LD R5
+    1463/     564 : E7                  	WR3
+    1464/     565 : 56 48               	JMS PRINT_ACC
+    1465/     567 : 56 53               	JMS PRINT_CRLF
+    1466/     569 :                     
+    1467/     569 : 74 2C               	ISZ R4,CMDW_L1
+    1468/     56B :                     	
+    1469/     56B : 40 10               	JUN CMD_LOOP		; return to command loop
+    1470/     56D :                     
+    1471/     56D :                     COMMAND_P:	;; write program Memory
+    1472/     56D : 20 46               	FIM P0, lo(STR_ADD)	; print " ADD="
+    1473/     56F : 57 00               	JMS PRINT_P0
+    1474/     571 : 56 00               	JMS GETCHAR_P1
+    1475/     573 : 56 28               	JMS PUTCHAR_P1
+    1476/     575 : 56 62               	JMS CTOI_P1_R5
+    1477/     577 : 56 53               	JMS PRINT_CRLF
+    1478/     579 :                     
+    1479/     579 : 22 46               	FIM P1,'F'
+    1480/     57B : 56 28               	JMS PUTCHAR_P1
+    1481/     57D : A5                  	LD R5
+    1482/     57E : 56 48               	JMS PRINT_ACC
+    1483/     580 : 22 30               	FIM P1,'0'
+    1484/     582 : 56 28               	JMS PUTCHAR_P1
+    1485/     584 : 22 3A               	FIM P1,':'
+    1486/     586 : 56 28               	JMS PUTCHAR_P1
+    1487/     588 :                     	
+    1488/     588 : A5                  	LD R5
+    1489/     589 : B0                  	XCH R0
+    1490/     58A :                     
+    1491/     58A : D0                  	LDM 0
+    1492/     58B : B1                  	XCH R1
+    1493/     58C :                     CMDP_L1:
+    1494/     58C : 22 20               	FIM P1, ' '
+    1495/     58E : 56 28               	JMS PUTCHAR_P1
+    1496/     590 :                     
+    1497/     590 : 56 00               	JMS GETCHAR_P1
+    1498/     592 : 56 28               	JMS PUTCHAR_P1
+    1499/     594 : 56 62               	JMS CTOI_P1_R5
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 27 - 2023/02/15 10:39:25
+
+
+    1500/     596 : A5                  	LD R5
+    1501/     597 : B4                  	XCH R4
+    1502/     598 :                     
+    1503/     598 : 56 00               	JMS GETCHAR_P1
+    1504/     59A : 56 28               	JMS PUTCHAR_P1
+    1505/     59C : 56 62               	JMS CTOI_P1_R5
+    1506/     59E : A5                  	LD R5
+    1507/     59F : B3                  	XCH R3
+    1508/     5A0 :                     
+    1509/     5A0 : A4                  	LD R4
+    1510/     5A1 : B2                  	XCH R2
+    1511/     5A2 :                     
+    1512/     5A2 : 50 A0               	JMS PM_WRITE_P0_P1
+    1513/     5A4 : 71 8C               	ISZ R1, CMDP_L1
+    1514/     5A6 :                     
+    1515/     5A6 : 56 53               	JMS PRINT_CRLF
+    1516/     5A8 :                     
+    1517/     5A8 : 40 10               	JUN CMD_LOOP		; return to command loop
+    1518/     5AA :                     
+    1519/     5AA :                     COMMAND_D:	;; Dump program Memory
+    1520/     5AA : 56 53               	JMS PRINT_CRLF
+    1521/     5AC :                     
+    1522/     5AC : 50 A6               	JMS PM_WRITE_READROUTINE
+    1523/     5AE :                     
+    1524/     5AE : 20 00               	FIM P0, 00H
+    1525/     5B0 :                     CMDD_L0:
+    1526/     5B0 : 22 46               	FIM P1,'F'
+    1527/     5B2 : 56 28               	JMS PUTCHAR_P1
+    1528/     5B4 : A0                  	LD R0
+    1529/     5B5 : 56 48               	JMS PRINT_ACC
+    1530/     5B7 : 22 30               	FIM P1,'0'
+    1531/     5B9 : 56 28               	JMS PUTCHAR_P1
+    1532/     5BB : 22 3A               	FIM P1,':'
+    1533/     5BD : 56 28               	JMS PUTCHAR_P1
+    1534/     5BF :                     CMDD_L1:	
+    1535/     5BF : 22 20               	FIM P1, ' '
+    1536/     5C1 : 56 28               	JMS PUTCHAR_P1
+    1537/     5C3 :                     
+    1538/     5C3 : 5F FE               	JMS PM_READ_P0_P2	; Read program memory
+    1539/     5C5 : A4                  	LD R4
+    1540/     5C6 : 56 48               	JMS PRINT_ACC
+    1541/     5C8 : A5                  	LD R5
+    1542/     5C9 : 56 48               	JMS PRINT_ACC
+    1543/     5CB :                     
+    1544/     5CB : 71 BF               	ISZ R1, CMDD_L1
+    1545/     5CD : 56 53               	JMS PRINT_CRLF
+    1546/     5CF : 70 B0                       ISZ R0, CMDD_L0
+    1547/     5D1 :                     	
+    1548/     5D1 : 40 10               	JUN CMD_LOOP		; return to command loop
+    1549/     5D3 :                     
+    1550/     5D3 :                     	;; Clear Program Memory
+    1551/     5D3 :                     COMMAND_L:
+    1552/     5D3 : 56 53               	JMS PRINT_CRLF
+    1553/     5D5 :                     
+    1554/     5D5 : 20 00               	FIM P0, 00H
+    1555/     5D7 : 22 00               	FIM P1, 00H
+    1556/     5D9 :                     CMDL_L1:
+    1557/     5D9 : 50 A0               	JMS PM_WRITE_P0_P1
+    1558/     5DB : 71 D9               	ISZ R1, CMDL_L1
+    1559/     5DD : 70 D9               	ISZ R0, CMDL_L1
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 28 - 2023/02/15 10:39:25
+
+
+    1560/     5DF :                     	
+    1561/     5DF : 40 10               	JUN CMD_LOOP		; return to command loop
+    1562/     5E1 :                     
+    1563/     5E1 :                     	;; Go to PM_TOP(0x0F00)
+    1564/     5E1 :                     COMMAND_G:
+    1565/     5E1 : 56 53               	JMS PRINT_CRLF
+    1566/     5E3 : 5F 00               	JMS PM_TOP
+    1567/     5E5 : 40 10               	JUN CMD_LOOP		; return to command loop
+    1568/     5E7 :                     
+    1569/     5E7 :                     ;;;----------------------------------------------------------------------------
+    1570/     5E7 :                     ;;; I/O routines located in Page 0600H
+    1571/     5E7 :                     ;;;----------------------------------------------------------------------------
+    1572/     600 :                     	org 0600H
+    1573/     600 :                     
+    1574/     600 :                     ;;;----------------------------------------------------------------------------
+    1575/     600 :                     ;;; GETCHAR_P1 and PUTCHAR_P1
+    1576/     600 :                     ;;; defined in separated file
+    1577/     600 :                     ;;;----------------------------------------------------------------------------
+    1578/     600 :                     
+    1579/     600 :                     ;;; supported baudrates are 4800bps or 9600bps
+    1580/     600 :                     ;; BAUDRATE equ 4800	; 4800 bps, 8 data bits, no parity, 1 stop bit
+    1581/     600 : =2580H               BAUDRATE equ 9600   ; 9600 bps, 8 data bits, no parity, 1 stop bit
+    1582/     600 :                     
+    1583/     600 :                             include "uart.inc"
+(1)    1/     600 :                     ;;;---------------------------------------------------------------------------
+(1)    2/     600 :                     ;;; uart.inc
+(1)    3/     600 :                     ;;; Software UART Routine
+(1)    4/     600 :                     ;;; by Ryo Mukai
+(1)    5/     600 :                     ;;;---------------------------------------------------------------------------
+(1)    6/     600 :                     
+(1)    7/     600 :                     ;;;---------------------------------------------------------------------------
+(1)    8/     600 :                     ;;; GETCHAR_P1
+(1)    9/     600 :                     ;;; receive a character from serial port (TEST) and put into P1(R2, R3)
+(1)   10/     600 :                     ;;;
+(1)   11/     600 :                     ;;; Input: none
+(1)   12/     600 :                     ;;; Output: P1(R2,R3), ACC=0(OK), ACC=1(error)
+(1)   13/     600 :                     ;;; Working: P6, P7
+(1)   14/     600 :                     ;;; This subroutine destroys P6, P7.
+(1)   15/     600 :                     ;;;---------------------------------------------------------------------------
+(1)   16/     600 :                     ;;; PUTCHAR_P1
+(1)   17/     600 :                     ;;; send the character in P1(R2, R3) to OUTPORT
+(1)   18/     600 :                     ;;; 
+(1)   19/     600 :                     ;;; Input: P1(R2,R3)
+(1)   20/     600 :                     ;;; Output: ACC=0
+(1)   21/     600 :                     ;;; Working: P6(R12R13), P7
+(1)   22/     600 :                     ;;; This subroutine destroys P6, P7.
+(1)   23/     600 :                     ;;; P1 is not affected
+(1)   24/     600 :                     ;;;---------------------------------------------------------------------------
+(1)   25/     600 :                     
+(1)   26/     600 : =2580H               	switch BAUDRATE
+(1)   27/     600 : =>FALSE              	case 4800
+(1)   28/     600 :                     	include "4800bps.inc"
+(1)   29/     600 : =>TRUE               	case 9600
+(1)   30/     600 :                     	include "9600bps.inc"
+(2)    1/     600 :                     ;;;---------------------------------------------------------------------------
+(2)    2/     600 :                     ;;; getchar and putchar functions
+(2)    3/     600 :                     ;;; baud rate = 9600bps
+(2)    4/     600 :                     ;;; 8bit, no parity, stop 1
+(2)    5/     600 :                     ;;;---------------------------------------------------------------------------
+(2)    6/     600 :                     
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 29 - 2023/02/15 10:39:25
+
+
+(2)    7/     600 :                     ;;;---------------------------------------------------------------------------
+(2)    8/     600 :                     ;;; GETCHAR_P1
+(2)    9/     600 :                     ;;; receive a character from serial port (TEST) and put into P1(R2, R3)
+(2)   10/     600 :                     ;;;
+(2)   11/     600 :                     ;;; Input: none
+(2)   12/     600 :                     ;;; Output: P1(R2,R3), ACC=0(OK), ACC=1(error)
+(2)   13/     600 :                     ;;; Working: P6, P7
+(2)   14/     600 :                     ;;; This subroutine destroys P6, P7.
+(2)   15/     600 :                     ;;; 
+(2)   16/     600 :                     ;;; baud rate: 9600bps (104.17us/bit, 9.645cycle/bit)
+(2)   17/     600 :                     ;;; 
+(2)   18/     600 :                     ;;;          |--12--|-9--|-9-|-9--|-12--|-9--|-9-|-9--|-10--|
+(2)   19/     600 :                     ;;; ~~~~~~~~|____|~~~~|____|~~~~|____|~~~~|____|~~~~|____|~~~~~ 9.645cycle/bit
+(2)   20/     600 :                     ;;;          ^      ^    ^   ^    ^     ^    ^   ^    ^     ^
+(2)   21/     600 :                     ;;;        start    0    1   2    3     4    5   6    7    stop
+(2)   22/     600 :                     ;;;               |->phase delay
+(2)   23/     600 :                     ;;; - In order to check data bits in the middle of the signal,
+(2)   24/     600 :                     ;;;   a "phase delay" should be added between the start bit and data bits.
+(2)   25/     600 :                     ;;;   (1 to 4 cycles may be moderate for 9.645cycle/bit)
+(2)   26/     600 :                     ;;; - Detection of the start bit may cause delay of 2 cycles due to polling.
+(2)   27/     600 :                     ;;;---------------------------------------------------------------------------
+(2)   28/     600 :                     
+(2)   29/     600 :                     GETCHAR_P1:
+(2)   30/     600 : 2C 0C                       FIM R12R13, loop(4)     ; loop for first(lower) 4 bit
+(2)   31/     602 :                                                     ; 
+(2)   32/     602 : 19 02                       JCN TN, $               ;(2) wait for start bit (TEST="0")
+(2)   33/     604 : 2E 0C               	FIM P7, loop(4)         ;(2)
+(2)   34/     606 : 7F 06               	ISZ R15,$               ;(8) 12 cycles between startbit and bit0
+(2)   35/     608 :                                                     ;    phase(bit0)= 12 -9.645 = 2.355cycle
+(2)   36/     608 :                     GETCHAR_L1:
+(2)   37/     608 : 19 0D               	JCN TN, GETCHAR_L2      ;(2) check a bit
+(2)   38/     60A : F1                          CLC                     ;<1> TEST="0" then CY=0
+(2)   39/     60B : 46 10                       JUN GETCHAR_L3          ;<2>
+(2)   40/     60D :                     GETCHAR_L2:
+(2)   41/     60D : FA                  	STC                     ;[1] TEST="1" then CY=1
+(2)   42/     60E : 00                          NOP                     ;[1]
+(2)   43/     60F : 00                          NOP                     ;[1]
+(2)   44/     610 :                     GETCHAR_L3:
+(2)   45/     610 : F6                  	RAR                     ;(1) load CY->ACC
+(2)   46/     611 : 00                  	NOP                     ;(1) 9cycle/bit (error=-0.645 cycle/bit)
+(2)   47/     612 : 7D 08                       ISZ R13, GETCHAR_L1     ;(2) repeat until 4 bit received
+(2)   48/     614 :                                                     ;    phase(here)= 2.355 -0.645*3 = 0.42cycle
+(2)   49/     614 : B3                  	XCH R3                  ;(1)
+(2)   50/     615 : 2C 0C               	FIM R12R13, loop(4)     ;(2) loop for second(upper) 4 bit
+(2)   51/     617 :                     		                ;    12 cycles between bit3 and bit4
+(2)   52/     617 :                                                     ;    phase(bit4)= 2.42 +12 -9.645 = 2.775cycle
+(2)   53/     617 :                     GETCHAR_L4:
+(2)   54/     617 : 19 1C               	JCN TN, GETCHAR_L5      ;(2) check a bit
+(2)   55/     619 : F1                          CLC                     ;<1> TEST="0" then CY=0
+(2)   56/     61A : 46 1F                       JUN GETCHAR_L6          ;<2>
+(2)   57/     61C :                     GETCHAR_L5:
+(2)   58/     61C : FA                  	STC                     ;[1] TEST="1" then CY=1
+(2)   59/     61D : 00                          NOP                     ;[1]
+(2)   60/     61E : 00                          NOP                     ;[1]
+(2)   61/     61F :                     GETCHAR_L6:
+(2)   62/     61F : F6                  	RAR                     ;(1) load CY->ACC
+(2)   63/     620 : 00                  	NOP                     ;(1) 9cycle/bit (error=-0.645 cycle/bit)
+(2)   64/     621 : 7D 17                       ISZ R13, GETCHAR_L4     ;(2) repeat until 4 bit received
+(2)   65/     623 :                                                     ;    phase(here)= 4.755 -0.645*3 = 0.84 cycle
+(2)   66/     623 : B2                  	XCH R2                  ;(1)
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 30 - 2023/02/15 10:39:25
+
+
+(2)   67/     624 :                                                     ;    10 cycles/between bit7 and stopbit
+(2)   68/     624 :                                                     ;    phase(stop)= 2.84 +10 -9.645 = 1.195cycle
+(2)   69/     624 :                     	;; check stop bit
+(2)   70/     624 : 19 27                       JCN TN, GETCHAR_OK      ; stop bit == "1"
+(2)   71/     626 : C1                          BBL 1                   ; stop bit != "1"
+(2)   72/     627 :                     GETCHAR_OK:
+(2)   73/     627 : C0                  	BBL 0
+(2)   74/     628 :                                     
+(2)   75/     628 :                     ;;;---------------------------------------------------------------------------
+(2)   76/     628 :                     ;;; PUTCHAR_P1
+(2)   77/     628 :                     ;;; send the character in P1(R2, R3) to OUTPORT
+(2)   78/     628 :                     ;;; 
+(2)   79/     628 :                     ;;; Input: P1(R2,R3)
+(2)   80/     628 :                     ;;; Output: ACC=0
+(2)   81/     628 :                     ;;; Working: P6(R12R13), P7
+(2)   82/     628 :                     ;;; This subroutine destroys P6, P7.
+(2)   83/     628 :                     ;;; P1 is not affected
+(2)   84/     628 :                     ;;; 
+(2)   85/     628 :                     ;;; baud rate: 9600bps (104.17us/bit, 9.645cycle/bit)
+(2)   86/     628 :                     ;;; 
+(2)   87/     628 :                     ;;; Input: P1(R2,R3)
+(2)   88/     628 :                     ;;; Output: ACC=0
+(2)   89/     628 :                     ;;; Working: P6(R12R13), P7
+(2)   90/     628 :                     ;;; This subroutine destroys P6, P7.
+(2)   91/     628 :                     ;;;---------------------------------------------------------------------------
+(2)   92/     628 :                     ;;; 
+(2)   93/     628 :                     ;;;         |--9-|-9--|-9-|-9--|-10--|-10-|-10-|-10-|-10--|(ave.9.56cycle/bit)
+(2)   94/     628 :                     ;;; ~~~~~~~~|____|~~~~|____|~~~~|____|~~~~|____|~~~~|____|~~~~~ 9.645cycle/bit
+(2)   95/     628 :                     ;;;         ^    ^    ^   ^    ^     ^    ^    ^    ^     ^
+(2)   96/     628 :                     ;;;       start  0    1   2    3     4    5    6    7     stop
+(2)   97/     628 :                     ;;;---------------------------------------------------------------------------
+(2)   98/     628 :                     
+(2)   99/     628 :                     PUTCHAR_P1:
+(2)  100/     628 : =>FALSE              	if (BANK_SERIAL != BANK_DEFAULT)
+(2)  101/     628 :                     	LDM BANK_SERIAL     ; bank of output port
+(2)  102/     628 :                             DCL                 ; set port bank
+(2)  103/     628 : [100]                	endif
+(2)  104/     628 :                     
+(2)  105/     628 : 2E 00                       FIM P7, CHIP_SERIAL ; chip# of output port
+(2)  106/     62A : 2F                  	SRC P7              ; set port address
+(2)  107/     62B :                     
+(2)  108/     62B : 2C 0B                       FIM R12R13, loop(5) ; start bit and lower 4bit(R3)
+(2)  109/     62D : A3                          LD R3
+(2)  110/     62E : F1                          CLC                 ; start bit is 0
+(2)  111/     62F : F5                          RAL
+(2)  112/     630 :                                     
+(2)  113/     630 :                     PUTCHAR_L1:
+(2)  114/     630 : 00                  	NOP                 ;(1) 9cycle/bit
+(2)  115/     631 : 00                          NOP                 ;(1)
+(2)  116/     632 : 00                          NOP                 ;(1)
+(2)  117/     633 : 00                          NOP                 ;(1)
+(2)  118/     634 : 00                          NOP                 ;(1)
+(2)  119/     635 : E1                          WMP                 ;(1)
+(2)  120/     636 : F6                          RAR                 ;(1)
+(2)  121/     637 : 7D 30                       ISZ R13, PUTCHAR_L1 ;(2)
+(2)  122/     639 :                     	
+(2)  123/     639 : 2C 0B                       FIM R12R13, loop(5) ;(2) upper 4bit(R2) and stop bit
+(2)  124/     63B : A2                          LD R2               ;(1)
+(2)  125/     63C : FA                          STC                 ;(1) stop bit is 1
+(2)  126/     63D : 00                  	NOP                 ;(1) timing adjustment
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 31 - 2023/02/15 10:39:25
+
+
+(2)  127/     63E : 00                          NOP                 ;(1) 10cycle between bit3 and bit4
+(2)  128/     63F :                     PUTCHAR_L2:
+(2)  129/     63F : E1                  	WMP                 ;(1) 10cycle/bit
+(2)  130/     640 : 2E 0E                       FIM R14R15, loop(2) ;(2)
+(2)  131/     642 : 7F 42                       ISZ R15, $          ;(4)
+(2)  132/     644 : F6                          RAR                 ;(1)
+(2)  133/     645 : 7D 3F                       ISZ R13, PUTCHAR_L2  ;(2)
+(2)  134/     647 :                     	
+(2)  135/     647 : =>FALSE              	if (BANK_SERIAL != BANK_DEFAULT)
+(2)  136/     647 :                     	LDM BANK_DEFAULT    
+(2)  137/     647 :                             DCL                 ; restore bank to default
+(2)  138/     647 : [135]                	endif
+(2)  139/     647 : C0                          BBL 0
+(2)  140/     648 :                     
+(2)  141/     648 :                     
+(1)   31/     648 : [26]                 	endcase
+(1)   32/     648 :                     
+(1)   33/     648 :                     ;;;---------------------------------------------------------------------------
+(1)   34/     648 :                     ;;; PRINT_ACC
+(1)   35/     648 :                     ;;; print contents of ACC('0'...'F') as a character
+(1)   36/     648 :                     ;;; destroy: P1, P6, P7, ACC
+(1)   37/     648 :                     ;;;---------------------------------------------------------------------------
+(1)   38/     648 :                     
+(1)   39/     648 :                     PRINT_ACC:
+(1)   40/     648 : 22 30               	FIM R2R3, 30H		;'0'
+(1)   41/     64A : F1                  	CLC			; clear carry
+(1)   42/     64B : FB                  	DAA			; ACC=ACC+6 if ACC>9 and set carry
+(1)   43/     64C : 1A 50               	JCN CN, PRINTACC_L1
+(1)   44/     64E : 62                  	INC R2
+(1)   45/     64F : F2                  	IAC
+(1)   46/     650 :                     PRINTACC_L1:	
+(1)   47/     650 : B3                  	XCH R3			; R3<-ACC
+(1)   48/     651 : 46 28               	JUN PUTCHAR_P1		; not JMS but JUN (Jump to PUTCHAR and return)
+(1)   49/     653 :                     
+(1)   50/     653 :                     
+(1)   51/     653 :                     
+(1)   52/     653 :                     ;;;---------------------------------------------------------------------------
+(1)   53/     653 :                     ;;; PRINT_CRLF
+(1)   54/     653 :                     ;;; print "\n\r"
+(1)   55/     653 :                     ;;; destroy: P1, ACC
+(1)   56/     653 :                     ;;;---------------------------------------------------------------------------
+(1)   57/     653 :                     PRINT_CRLF:
+(1)   58/     653 : 22 0D               	FIM P1, '\r'
+(1)   59/     655 : 56 28               	JMS PUTCHAR_P1
+(1)   60/     657 : 22 0A               	FIM P1, '\n'
+(1)   61/     659 : 56 28               	JMS PUTCHAR_P1
+(1)   62/     65B : C0                  	BBL 0
+(1)   63/     65C :                     
+(1)   64/     65C :                     ;;;---------------------------------------------------------------------------
+(1)   65/     65C :                     ;;; INIT_SERIAL
+(1)   66/     65C :                     ;;; Initialize serial port
+(1)   67/     65C :                     ;;;---------------------------------------------------------------------------
+(1)   68/     65C :                     
+(1)   69/     65C :                     INIT_SERIAL:
+(1)   70/     65C : =>FALSE              	if (BANK_SERIAL != BANK_DEFAULT)
+(1)   71/     65C :                     	LDM BANK_SERIAL     ; bank of output port
+(1)   72/     65C :                             DCL                 ; set port bank
+(1)   73/     65C : [70]                 	endif
+(1)   74/     65C :                     	
+(1)   75/     65C : 2E 00                       FIM P7, CHIP_SERIAL ; chip# of output port
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(uart.inc) - Page 32 - 2023/02/15 10:39:25
+
+
+(1)   76/     65E : 2F                  	SRC P7              ; set port address
+(1)   77/     65F : D1                  	LDM 1
+(1)   78/     660 : E1                          WMP                 ; set serial port to 1 (TTL->H)
+(1)   79/     661 :                     
+(1)   80/     661 : =>FALSE              	if (BANK_SERIAL != BANK_DEFAULT)
+(1)   81/     661 :                     	LDM BANK_DEFAULT    
+(1)   82/     661 :                             DCL                 ; restore bank to default
+(1)   83/     661 : [80]                 	endif
+(1)   84/     661 :                     
+(1)   85/     661 : C0                          BBL 0
+(1)   86/     662 :                     
+(1)   87/     662 :                     
+    1584/     662 :                     
+    1585/     662 :                     ;;;---------------------------------------------------------------------------
+    1586/     662 :                     ;;; CTOI_P1_R5
+    1587/     662 :                     ;;; convert character ('0'...'f') to value 0000 ... 1111
+    1588/     662 :                     ;;; input: P1(R2R3)
+    1589/     662 :                     ;;; output: R5
+    1590/     662 :                     ;;;---------------------------------------------------------------------------
+    1591/     662 :                     CTOI_P1_R5:
+    1592/     662 : F0                  	CLB
+    1593/     663 : D3                  	LDM 3
+    1594/     664 : 92                  	SUB R2
+    1595/     665 : 14 6B               	JCN Z, CTOI_09		; check upper 4bit
+    1596/     667 : F0                  	CLB
+    1597/     668 : D9                  	LDM 9
+    1598/     669 : 83                  	ADD R3
+    1599/     66A : B3                  	XCH R3
+    1600/     66B :                     CTOI_09:
+    1601/     66B : A3                  	LD R3
+    1602/     66C : B5                  	XCH R5
+    1603/     66D : C0                  	BBL 0
+    1604/     66E :                     	
+    1605/     66E :                     ;;;----------------------------------------------------------------------------
+    1606/     66E :                     ;;; DISPLED_P1
+    1607/     66E :                     ;;;   DISPLAY the contents of P1 on Port 2 and 3
+    1608/     66E :                     ;;; Input: P1(R2R3)
+    1609/     66E :                     ;;; Output:  ACC=0
+    1610/     66E :                     ;;; Working: P7
+    1611/     66E :                     ;;; Destroy: P7
+    1612/     66E :                     ;;;----------------------------------------------------------------------------
+    1613/     66E :                     
+    1614/     66E :                     DISPLED_P1:
+    1615/     66E : D1                  	LDM BANK_RAM2
+    1616/     66F : FD                          DCL
+    1617/     670 : 2E 00                       FIM P7, CHIP_RAM2
+    1618/     672 : 2F                          SRC P7
+    1619/     673 : A3                          LD R3
+    1620/     674 : E1                          WMP
+    1621/     675 :                     	
+    1622/     675 : D1                          LDM BANK_RAM3
+    1623/     676 : FD                          DCL
+    1624/     677 : 2E 40                       FIM P7, CHIP_RAM3
+    1625/     679 : 2F                          SRC P7
+    1626/     67A : A2                          LD R2
+    1627/     67B : E1                          WMP
+    1628/     67C :                     
+    1629/     67C : D0                          LDM BANK_DEFAULT	; restore BANK to default
+    1630/     67D : FD                  	DCL
+    1631/     67E :                     	
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 33 - 2023/02/15 10:39:25
+
+
+    1632/     67E : C0                          BBL 0
+    1633/     67F :                     
+    1634/     67F :                     ;;;----------------------------------------------------------------------------
+    1635/     67F :                     ;;; DISPLED_ACC
+    1636/     67F :                     ;;;   DISPLAY the contents of ACC on Port 1
+    1637/     67F :                     ;;; Input: ACC
+    1638/     67F :                     ;;; Output:  ACC=0
+    1639/     67F :                     ;;; Working: P7
+    1640/     67F :                     ;;; Destroy: P7
+    1641/     67F :                     ;;;----------------------------------------------------------------------------
+    1642/     67F :                     
+    1643/     67F :                     DISPLED_ACC:
+    1644/     67F : =>FALSE              	if (BANK_RAM1 != BANK_DEFAULT)
+    1645/     67F :                             LDM BANK_RAM1
+    1646/     67F :                             DCL
+    1647/     67F : [1644]               	endif
+    1648/     67F :                     	
+    1649/     67F : 2E 40                       FIM P7, CHIP_RAM1
+    1650/     681 : BE                          XCH R14         ; save ACC
+    1651/     682 :                     
+    1652/     682 : BE                          XCH R14         ; restore ACC
+    1653/     683 : 2F                          SRC P7          
+    1654/     684 : E1                          WMP
+    1655/     685 :                     
+    1656/     685 : =>FALSE              	if (BANK_RAM1 != BANK_DEFAULT)
+    1657/     685 :                     	LDM BANK_DEFAULT	; restore BANK to default
+    1658/     685 :                     	DCL
+    1659/     685 : [1656]               	endif
+    1660/     685 :                     	
+    1661/     685 : C0                  	BBL 0
+    1662/     686 :                                     
+    1663/     686 :                     ;;;----------------------------------------------------------------------------
+    1664/     686 :                     ;;; BLINK_LED
+    1665/     686 :                     ;;;   Blink LED N times (N=ACC, N=16 if ACC==0)
+    1666/     686 :                     ;;; Input: ACC
+    1667/     686 :                     ;;; Output: ACC=0
+    1668/     686 :                     ;;; Working: R11
+    1669/     686 :                     ;;; Destroy: R11, P6, P7
+    1670/     686 :                     ;;;----------------------------------------------------------------------------
+    1671/     686 :                     
+    1672/     686 :                     BLINK_LED:
+    1673/     686 : F4                  	CMA
+    1674/     687 : F2                  	IAC
+    1675/     688 : BB                  	XCH R11         ; set counter=16-ACC
+    1676/     689 :                     BLINK_L0	
+    1677/     689 : D0                          LDM BANK_RAM1
+    1678/     68A : 2E 40                       FIM P7, CHIP_RAM1
+    1679/     68C : 56 9D                       JMS BLINK_SUB
+    1680/     68E :                     
+    1681/     68E : D1                          LDM BANK_RAM2
+    1682/     68F : 2E 00                       FIM P7, CHIP_RAM2
+    1683/     691 : 56 9D                       JMS BLINK_SUB
+    1684/     693 :                     
+    1685/     693 : D1                          LDM BANK_RAM3
+    1686/     694 : 2E 40                       FIM P7, CHIP_RAM3
+    1687/     696 : 56 9D                       JMS BLINK_SUB
+    1688/     698 :                     	
+    1689/     698 : 7B 89                       ISZ R11, BLINK_L0
+    1690/     69A :                     
+    1691/     69A : D0                  	LDM BANK_DEFAULT
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 34 - 2023/02/15 10:39:25
+
+
+    1692/     69B : FD                  	DCL
+    1693/     69C :                     
+    1694/     69C : C0                  	BBL 0
+    1695/     69D :                     
+    1696/     69D :                     BLINK_SUB:	
+    1697/     69D : FD                          DCL
+    1698/     69E : 2F                          SRC P7
+    1699/     69F : D8                          LDM 8
+    1700/     6A0 : E1                          WMP             ; LED(MSB) on
+    1701/     6A1 : D8                          LDM 8
+    1702/     6A2 : 56 A7                       JMS WAIT10MS    ; wait 80ms
+    1703/     6A4 : D0                          LDM 0
+    1704/     6A5 : E1                          WMP             ; LED off
+    1705/     6A6 : C0                          BBL 0
+    1706/     6A7 :                     
+    1707/     6A7 :                     ;;;----------------------------------------------------------------------------
+    1708/     6A7 :                     ;;; Wait Subroutines WAIT10MS and WAIT100MS
+    1709/     6A7 :                     ;;;
+    1710/     6A7 :                     ;;; Constants '45EF'(10ms) and '11FE'(100ms) are calculated
+    1711/     6A7 :                     ;;; by Jim's 4004 Delay Loop Calculator
+    1712/     6A7 :                     ;;; https://github.com/jim11662418/4004-delay-calculator
+    1713/     6A7 :                     ;;;
+    1714/     6A7 :                     ;;; 10.8003857uS/cycle (@5.185MHz clock)
+    1715/     6A7 :                     ;;;----------------------------------------------------------------------------
+    1716/     6A7 :                     ;;;----------------------------------------------------------------------------
+    1717/     6A7 :                     ;;; WAIT10MS
+    1718/     6A7 :                     ;;; Input: ACC
+    1719/     6A7 :                     ;;; Output: return with ACC=0
+    1720/     6A7 :                     ;;; Destroy: P6, P7, (R12, R13, R14, R15)
+    1721/     6A7 :                     ;;;   wait for 10 * N ms (N=ACC, N=16 if ACC==0)
+    1722/     6A7 :                     ;;;----------------------------------------------------------------------------
+    1723/     6A7 :                                     
+    1724/     6A7 :                     WAIT10MS:
+    1725/     6A7 : 2C 45               	FIM R12R13, 045H  ; 9947us delay(921 cycles)
+    1726/     6A9 : 2E EF                       FIM R14R15, 0EFH  ; 
+    1727/     6AB :                     W10_L1:
+    1728/     6AB : 7C AB                	ISZ R12, W10_L1
+    1729/     6AD : 7D AB                       ISZ R13, W10_L1
+    1730/     6AF : 7E AB                       ISZ R14, W10_L1
+    1731/     6B1 : 7F AB                       ISZ R15, W10_L1
+    1732/     6B3 : F8                          DAC
+    1733/     6B4 : 1C A7                       JCN ZN, WAIT10MS  ; 9979us delay(924 cycles)/loop
+    1734/     6B6 :                     W10_EXIT:
+    1735/     6B6 : C0                  	BBL 0
+    1736/     6B7 :                     
+    1737/     6B7 :                     ;;;----------------------------------------------------------------------------
+    1738/     6B7 :                     ;;; WAIT100MS
+    1739/     6B7 :                     ;;; Input: ACC
+    1740/     6B7 :                     ;;; Output: return with ACC=0
+    1741/     6B7 :                     ;;; Destroy: P6, P7, (R12, R13, R14, R15)
+    1742/     6B7 :                     ;;;   wait for 100 * N ms (N=ACC, N=16 if ACC==0)
+    1743/     6B7 :                     ;;;----------------------------------------------------------------------------
+    1744/     6B7 :                                     
+    1745/     6B7 :                     WAIT100MS:
+    1746/     6B7 : 2C 11               	FIM R12R13, 011H  ; 99958us delay(9255 cycles)
+    1747/     6B9 : 2E FE                       FIM R14R15, 0FEH  ; 
+    1748/     6BB :                     W100_L1:
+    1749/     6BB : 7C BB                       ISZ R12, W100_L1
+    1750/     6BD : 7D BB                       ISZ R13, W100_L1
+    1751/     6BF : 7E BB                       ISZ R14, W100_L1
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 35 - 2023/02/15 10:39:25
+
+
+    1752/     6C1 : 7F BB                       ISZ R15, W100_L1
+    1753/     6C3 : F8                          DAC
+    1754/     6C4 : 1C B7                       JCN ZN, WAIT100MS  ; 99990us delay(9258 cycles)/loop
+    1755/     6C6 :                     W100_EXIT:
+    1756/     6C6 : C0                  	BBL 0
+    1757/     6C7 :                                     
+    1758/     6C7 :                     ;;;----------------------------------------------------------------------------
+    1759/     6C7 :                     ;;; Print subroutine and string data located in Page 7 (0700H-07FFH)
+    1760/     6C7 :                     ;;; 
+    1761/     6C7 :                     ;;; The string data sould be located in the same page as the print routine.
+    1762/     6C7 :                     ;;;----------------------------------------------------------------------------
+    1763/     700 :                             org 0700H
+    1764/     700 :                     ;;;----------------------------------------------------------------------------
+    1765/     700 :                     ;;; PRINT_P0
+    1766/     700 :                     ;;; Input: P0 (top of the string is 0700H+P0)
+    1767/     700 :                     ;;; Working: P1(R2, R3)
+    1768/     700 :                     ;;; Destroy: P1, P6, P7 (by PUTCHAR_P1), 
+    1769/     700 :                     ;;;----------------------------------------------------------------------------
+    1770/     700 :                     
+    1771/     700 :                     PRINT_P0:
+    1772/     700 : 32                          FIN P1			; P1=(P0)
+    1773/     701 : A2                          LD R2
+    1774/     702 : 14 0B                       JCN Z, P7_UPPER0	; R2==0
+    1775/     704 :                     P7_PUT:
+    1776/     704 : 56 28                       JMS PUTCHAR_P1             ; putchar(P1)
+    1777/     706 : 71 00                       ISZ R1, PRINT_P0           ; P0=P0+1
+    1778/     708 : 60                          INC R0
+    1779/     709 : 47 00                       JUN PRINT_P0               ; print remaining string
+    1780/     70B :                     P7_UPPER0:
+    1781/     70B : A3                  	LD R3
+    1782/     70C : 1C 04                       JCN ZN, P7_PUT     	; R3 != 0
+    1783/     70E :                     P7_EXIT:
+    1784/     70E : C0                          BBL 0                   ; exit if P1(R2,R3) == 0
+    1785/     70F :                                     
+    1786/     70F :                     ;;;----------------------------------------------------------------------------
+    1787/     70F :                     ;;; String data
+    1788/     70F :                     ;;;----------------------------------------------------------------------------
+    1789/     70F :                     
+    1790/     70F :                     STR_OMSG:
+    1791/     70F : 0D 49 6E 74 65 6C   	data "\rIntel MCS-4 (4004)\n\rTiny Monitor\n\r", 0
+              715 : 20 4D 43 53 2D 34 
+              71B : 20 28 34 30 30 34 
+              721 : 29 0A 0D 54 69 6E 
+              727 : 79 20 4D 6F 6E 69 
+              72D : 74 6F 72 0A 0D 00 
+    1792/     733 :                     STR_VFD_INIT:		;reset VFD and set scroll mode
+    1793/     733 : 1B 40 1F 02 00      	data 1bH, 40H, 1fH, 02H, 0
+    1794/     738 :                     STR_BANK:
+    1795/     738 : 20 42 41 4E 4B 3D   	data " BANK=", 0
+              73E : 00                
+    1796/     73F :                     STR_CHIP:
+    1797/     73F : 20 43 48 49 50 3D   	data " CHIP=", 0
+              745 : 00                
+    1798/     746 :                     STR_ADD:
+    1799/     746 : 20 41 44 44 28 46   	data " ADD(Fx0)=", 0
+              74C : 78 30 29 3D 00    
+    1800/     751 :                     STR_CALC:
+    1801/     751 : 0A 0D 43 61 6C 63   	data "\n\rCalculator Mode\n\r", 0
+              757 : 75 6C 61 74 6F 72 
+              75D : 20 4D 6F 64 65 0A 
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 36 - 2023/02/15 10:39:25
+
+
+              763 : 0D 00             
+    1802/     765 :                     STR_CMDERR:
+    1803/     765 : 0A 0D 72 3A 52 65   	data "\n\rr:Read ram, w:Write ram, p:write Pm, d:Dump pm, l:cLear, c:Calc\n\r", 0 ;
+              76B : 61 64 20 72 61 6D 
+              771 : 2C 20 77 3A 57 72 
+              777 : 69 74 65 20 72 61 
+              77D : 6D 2C 20 70 3A 77 
+              783 : 72 69 74 65 20 50 
+              789 : 6D 2C 20 64 3A 44 
+              78F : 75 6D 70 20 70 6D 
+              795 : 2C 20 6C 3A 63 4C 
+              79B : 65 61 72 2C 20 63 
+              7A1 : 3A 43 61 6C 63 0A 
+              7A7 : 0D 00             
+    1804/     7A9 :                     STR_CALCERR:
+    1805/     7A9 : 2A 2A 45 52 52 4F   	data "**ERROR**\n",0
+              7AF : 52 2A 2A 0A 00    
+    1806/     7B4 :                     
+    1807/     7B4 :                     ;;;----------------------------------------------------------------------------
+    1808/     7B4 :                     ;;; String data
+    1809/     7B4 :                     ;;;----------------------------------------------------------------------------
+    1810/     7B4 :                     	
+    1811/     7B4 :                     ;;;---------------------------------------------------------------------------
+    1812/     7B4 :                     ;;; Subroutine for reading program memory located on page 15 (0F00H-0FFFH)
+    1813/     7B4 :                     ;;;---------------------------------------------------------------------------
+    1814/     7B4 :                     ;;; READPM_P0
+    1815/     7B4 :                     ;;; P1 = (P0)
+    1816/     7B4 :                     ;;; input: P0
+    1817/     7B4 :                     ;;; output: P1
+    1818/     7B4 :                     ;;;---------------------------------------------------------------------------
+    1819/     7B4 :                     ;;; 	org 0FF0H
+    1820/     7B4 :                     ;;; PM_READ_P0_P2:
+    1821/     7B4 : 34                  	FIN P2
+    1822/     7B5 : C0                  	BBL 0
+    1823/     7B6 :                     
+    1824/     7B6 :                     	end
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 37 - 2023/02/15 10:39:25
+
+
+  Symbol Table (* = unused):
+  --------------------------
+
+ ADD_FRACTION_P6_P7 :           249 C | *ADD_FRA_EXIT :                 257 C |
+ ADD_FRA_LOOP :                 24E C |  ALIGN_EXIT :                   3A8 C |
+ ALIGN_REGISTER_XY :            387 C |
+*ARCHITECTURE :                                      "x86_64-unknown-linux" - |
+ BANK_DEFAULT :                   0 - |  BANK_RAM0 :                      0 - |
+ BANK_RAM1 :                      0 - |  BANK_RAM2 :                      1 - |
+ BANK_RAM3 :                      1 - |  BANK_SERIAL :                    0 - |
+ BAUDRATE :                    2580 - |  BLINK_L0 :                     689 C |
+ BLINK_LED :                    686 C |  BLINK_SUB :                    69D C |
+*CASESENSITIVE :                  0 - |  CHANGE_SIGN_REG_X :            3D7 C |
+ CHIP_RAM0 :                      0 - |  CHIP_RAM1 :                     40 - |
+ CHIP_RAM2 :                      0 - |  CHIP_RAM3 :                     40 - |
+ CHIP_SERIAL :                    0 - |  CLEAR_FRACTION_P0 :            3AF C |
+ CLEAR_REGISTER_L0 :            3B0 C |  CLEAR_REGISTER_P0 :            3A9 C |
+ CMDC_ADD :                     200 C |  CMDC_ADD_EXIT :                237 C |
+ CMDC_ADD_SAMESIGN :            231 C |  CMDC_ADD_ZERO_EXIT :           239 C |
+ CMDC_CLEAR :                   197 C |
+ CMDC_CLEAR_REGX_IF_FIRST_KEYIN :                                       18B C |
+ CMDC_DIGITPOINT :              1AD C |  CMDC_DIV :                     400 C |
+ CMDC_DIVIDEND_ZERO :           44D C |  CMDC_DIV_BY_ZERO :             446 C |
+ CMDC_DP_EXIT :                 1B6 C |  CMDC_ENTER :                   1A1 C |
+ CMDC_L0 :                      1C5 C |  CMDC_L1 :                      120 C |
+ CMDC_L10 :                     181 C |  CMDC_L11 :                     189 C |
+ CMDC_L2 :                      12A C |  CMDC_L3 :                      134 C |
+ CMDC_L4 :                      13E C |  CMDC_L5 :                      148 C |
+ CMDC_L6 :                      152 C |  CMDC_L7 :                      15C C |
+ CMDC_L8 :                      168 C |  CMDC_L9 :                      172 C |
+ CMDC_LOOP_NUMIN :              10A C |  CMDC_LOOP_START :              106 C |
+ CMDC_MUL :                     29B C |  CMDC_MUL_EXIT :                2BF C |
+ CMDC_MUL_L0 :                  2BD C |  CMDC_MUL_ZERO :                2C1 C |
+ CMDC_NORMALIZE_AND_EXIT :      23F C |  CMDC_NUM :                     1B8 C |
+ CMDC_NUM_EXIT :                1E1 C |  CMDC_PRINT :                   32A C |
+ CMDC_SETNUM :                  1D2 C |  CMDC_SUB :                     340 C |
+ CMDD_L0 :                      5B0 C |  CMDD_L1 :                      5BF C |
+ CMDL_L1 :                      5D9 C |  CMDP_L1 :                      58C C |
+ CMDR_L1 :                      502 C |  CMDR_L2 :                      504 C |
+ CMDW_L1 :                      52C C |  CMDW_L2 :                      52E C |
+ CMD_LOOP :                      10 C |  CMD_SUB_X_Y :                  229 C |
+*CMD_SUB_Y_X :                  217 C |  CMP_EXIT01 :                    9E C |
+ CMP_EXIT11 :                    9F C |  CMP_FRACTION_EXIT10 :          270 C |
+ CMP_FRACTION_EXIT11 :          271 C |  CMP_FRACTION_LOOP :            25A C |
+ CMP_FRACTION_NEXT :            26D C |  CMP_FRACTION_P6_P7 :           258 C |
+ CMP_L1 :                        96 C |  CMP_P0P1 :                      8E C |
+ COMMAND_C :                    100 C |  COMMAND_D :                    5AA C |
+ COMMAND_G :                    5E1 C |  COMMAND_L :                    5D3 C |
+ COMMAND_P :                    56D C |  COMMAND_R :                    500 C |
+ COMMAND_W :                    52A C | *COMPMODE :                       0 - |
+*CONSTPI :        3.141592653589793 - |  CTOI_09 :                      66B C |
+ CTOI_P1_R5 :                   662 C | *DATE :                "2023/02/15" - |
+ DISPLED_ACC :                  67F C |  DISPLED_P1 :                   66E C |
+ DIV_FRAC :                     442 C |  DIV_FRACTION_XY :              453 C |
+ DIV_FRAC_ADJ_EXP :             42F C |  DIV_LOOP :                     45F C |
+ DIV_LOOP_D14 :                 41C C |  DIV_LOOP_L0 :                  424 C |
+ DIV_SUB_COUNT :                461 C |  DIV_SUB_COUNT_EXIT :           46F C |
+ EY_GE_EX :                     3A1 C | *FALSE :                          0 - |
+ FKEY_EXIT :                    196 C | *FULLPMMU :                       1 - |
+ GETCHAR_L1 :                   608 C |  GETCHAR_L2 :                   60D C |
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 38 - 2023/02/15 10:39:25
+
+
+ GETCHAR_L3 :                   610 C |  GETCHAR_L4 :                   617 C |
+ GETCHAR_L5 :                   61C C |  GETCHAR_L6 :                   61F C |
+ GETCHAR_OK :                   627 C |  GETCHAR_P1 :                   600 C |
+ GET_SIGN_EXIT :                491 C |  GET_SIGN_PRODUCT_P6_P7 :       487 C |
+*HAS64 :                          1 - | *HASFPU :                         0 - |
+*HASPMMU :                        0 - |  INIT_SERIAL :                  65C C |
+*INSUPMODE :                      0 - |  ISNUM_FALSE :                  367 C |
+ ISNUM_P1 :                     35A C |  ISZERO_EXIT0 :                 3D6 C |
+ ISZERO_LOOP :                  3CF C |  ISZERO_REGISTER_P0 :           3CD C |
+ L0 :                            2E C |  L1 :                            38 C |
+ L2 :                            42 C |  L3 :                            4A C |
+ L4 :                            52 C |  L5 :                            5A C |
+ L6 :                            62 C |  L9 :                            6A C |
+ LD_FRACTION_L0 :               3C5 C |  LD_FRACTION_P6_P7 :            3C5 C |
+ LD_REGISTER_P6_P7 :            3B5 C | *LISTON :                         1 - |
+ L_CR :                          14 C | *MACEXP :                         7 - |
+*MAIN :                           0 C | *MOMCPU :                      4004 - |
+*MOMCPUNAME :                "4004" - |  MUL_ADD_LOOP :                 31E C |
+ MUL_FRACTION_XY :              300 C |  MUL_LOOP :                     314 C |
+ MUL_LOOP_NEXT :                322 C | *NESTMAX :                      100 - |
+ NM_EXIT :                      299 C |  NM_GO_SHIFT :                  284 C |
+ NM_LOOP :                      27A C |  NM_LOOP_ENTRY :                282 C |
+ NM_NOERROR :                   298 C |  NORMALIZE_REGISTER_P0 :        272 C |
+*P7_EXIT :                      70E C |  P7_PUT :                       704 C |
+ P7_UPPER0 :                    70B C | *PADDING :                        1 - |
+ PM_READ_P0_P2 :               0FFE - |  PM_TOP :                      0F00 - |
+ PM_WRITE_P0_P1 :               0A0 C |  PM_WRITE_READROUTINE :         0A6 C |
+ PRINTACC_L1 :                  650 C |  PRINT_ACC :                    648 C |
+ PRINT_CHECK_EXP :              4B1 C |  PRINT_CRLF :                   653 C |
+ PRINT_EXIT :                   4D0 C |  PRINT_P0 :                     700 C |
+ PRINT_REGISTER_EQU_ERR :       49A C |  PRINT_REGISTER_L1 :            4CE C |
+ PRINT_REGISTER_LOOP :          4BB C |  PRINT_REGISTER_LOOP_SETUP :    4B8 C |
+ PRINT_REGISTER_P0 :            492 C |  PRINT_REGISTER_SGN :           4A4 C |
+ PRINT_RESULT_AND_ENTER_TO_Y :  334 C |  PUTCHAR_L1 :                   630 C |
+ PUTCHAR_L2 :                   63F C |  PUTCHAR_P1 :                   628 C |
+*REG_A :                         50 - |  REG_ERROR_DIVBYZERO :            2 - |
+ REG_ERROR_OVERFLOW :             1 - | *REG_H :                         70 - |
+ REG_M :                         40 - | *REG_T :                         30 - |
+ REG_X :                          0 - | *REG_XI :                        60 - |
+ REG_Y :                         10 - | *REG_Z :                         20 - |
+*RELAXED :                        0 - |  SETBANKCHIP_P5 :                70 C |
+ SHIFTL_EXIT :                  386 C |  SHIFTL_LOOP :                  36F C |
+ SHIFTL_NEXT :                  384 C | *SHIFTL_READ :                  373 C |
+ SHIFTL_WRITE :                 379 C |  SHIFTR_EXIT :                  359 C |
+ SHIFTR_LOOP :                  34B C |  SHIFTR_NEXT :                  357 C |
+*SHIFTR_READ :                  34E C |  SHIFTR_WRITE :                 350 C |
+ SHIFT_FRACTION_LEFT_P0_ACC :   368 C |  SHIFT_FRACTION_RIGHT_P0_ACC :  344 C |
+ STR_ADD :                      746 C |  STR_BANK :                     738 C |
+ STR_CALC :                     751 C | *STR_CALCERR :                  7A9 C |
+ STR_CHIP :                     73F C |  STR_CMDERR :                   765 C |
+ STR_OMSG :                     70F C |  STR_VFD_INIT :                 733 C |
+ SUB_FRACTION_P6_P7 :           1E5 C |  SUB_FRA_LOOP :                 1EB C |
+*TIME :                  "10:39:25" - | *TRUE :                           1 - |
+*VERSION :                     142F - | *W100_EXIT :                    6C6 C |
+ W100_L1 :                      6BB C | *W10_EXIT :                     6B6 C |
+ W10_L1 :                       6AB C |  WAIT100MS :                    6B7 C |
+ WAIT10MS :                     6A7 C |
+
+    223 symbols
+     35 unused symbols
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 39 - 2023/02/15 10:39:25
+
+
+
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 40 - 2023/02/15 10:39:25
+
+
+  Register Definitions (* = unused):
+  ----------------------------------
+
+ P0 --> R0P                           |  P1 --> R1P                          
+ P2 --> R2P                           |  P3 --> R3P                          
+*P4 --> R4P                           |  P5 --> R5P                          
+ P6 --> R6P                           |  P7 --> R7P                          
+*R10 --> R10                          | *R10R11 --> R5P                      
+*R11 --> R11                          | *R12 --> R12                         
+*R12R13 --> R6P                       | *R13 --> R13                         
+*R14 --> R14                          | *R14R15 --> R7P                      
+*R15 --> R15                         
+
+     17 definitions
+
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 41 - 2023/02/15 10:39:25
+
+
+  Defined Functions:
+  ------------------
+
+LOOPS                                 | LOOP                                 
+LO                                    |
+
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 42 - 2023/02/15 10:39:25
+
+
+  Code Pages:
+  ----------
+
+STANDARD (0 changed characters)
+
+1 code page
+
+0.02 seconds assembly time
+
+   2114 lines source file
+      2 passes
+      0 errors
+      0 warnings
