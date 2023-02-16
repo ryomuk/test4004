@@ -41,5 +41,5 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 - https://www.intel-vintage.info/intelmcs.htm
 
 ### 開発環境
-- http://john.ccac.rwth-aachen.de:8000/as/ (マクロアセンブラ)
+- [The Macroassembler AS](http://john.ccac.rwth-aachen.de:8000/as/)
 - [Intel 4004 emulator assembler disassembler](http://e4004.szyc.org/)
