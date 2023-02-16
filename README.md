@@ -7,13 +7,14 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 ![](images/title.jpg)
 ![](images/breadboard.jpg)
 
-関連ブログ
-https://blog.goo.ne.jp/tk-80
+## ブログ
+関連する情報が書いてあるかも．
+- https://blog.goo.ne.jp/tk-80
 
 2022年末に運良くIntel 4004を入手することができました．せっかくだから動かしてみようと思い，このプロジェクトを始めました．
 現在進行中の未完成プロジェクトです．
 
 
-# 参考文献等
+## 参考文献等
 - https://github.com/jim11662418/4004-SBC
 - https://github.com/novi/4004MainBoard
