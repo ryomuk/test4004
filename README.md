@@ -24,6 +24,11 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 関連する情報が書いてあるかも．
 - https://blog.goo.ne.jp/tk-80
 
-## 参考文献等
+## 参考にした文献，サイト
+### 4004関連
+- https://www.4004.com/
 - https://github.com/jim11662418/4004-SBC
 - https://github.com/novi/4004MainBoard
+
+### 開発環境
+- http://john.ccac.rwth-aachen.de:8000/as/ (マクロアセンブラ)
