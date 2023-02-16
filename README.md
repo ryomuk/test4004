@@ -7,7 +7,7 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 ![](images/title.jpg)
 ![](images/breadboard.jpg)
 
-## このプロジェクトについて
+## 概要
 2022年末に運良くIntel 4004を入手することができました．せっかくだから動かしてみようと思い，このプロジェクトを始めました．
 現在進行中の未完成プロジェクトです．
 
@@ -17,9 +17,9 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 
 ## ToDO
 - VTL的な言語
--- マンデルブロ集合を表示するぐらいのプログラムを実行させたい
+ - マンデルブロ集合を表示するぐらいのプログラムを実行させたい
 - プログラムメモリのRAM領域の拡大
--- 現在の実装では256byteに制限されている
+ - 現在の実装では256byteに制限されている
 - プリント基板作成
 
 
