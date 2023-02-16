@@ -12,7 +12,9 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 現在進行中の未完成プロジェクトです．
 
 ## 作ったもの
-- 簡易モニタープログラム
+- 4004実験用ボード
+- シリアル通信用インターフェース
+- 簡易モニター
 - 電卓
 
 ## ToDO
