@@ -16,12 +16,9 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 - 電卓
 
 ## ToDO
-- VTL的な言語
- - マンデルブロ集合を表示するぐらいのプログラムを実行させたい
-- プログラムメモリのRAM領域の拡大
- - 現在の実装では256byteに制限されている
+- VTL的な言語(マンデルブロ集合を表示するぐらいのプログラムを実行させたい)
+- プログラムメモリのRAM領域の拡大(現在の実装では256byteに制限されている)
 - プリント基板作成
-
 
 ## ブログ
 関連する情報が書いてあるかも．
