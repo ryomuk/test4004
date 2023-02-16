@@ -42,4 +42,4 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 
 ### 開発環境
 - http://john.ccac.rwth-aachen.de:8000/as/ (マクロアセンブラ)
-- http://e4004.szyc.org/
+- [Intel 4004 emulator assembler disassembler](http://e4004.szyc.org/)
