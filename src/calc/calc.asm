@@ -218,10 +218,10 @@ CMP_EXIT11
 	
 PM_WRITE_P0_P1:
 	SRC P0
-	LD R2
-	WPM
 	LD R3
-	WPM
+	WPM			; write lower 4bit
+	LD R2
+	WPM			; write higher 4bit
 	BBL 0
 
 ;;;---------------------------------------------------------------------------
