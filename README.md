@@ -27,10 +27,16 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 - https://blog.goo.ne.jp/tk-80
 
 ## 参考にした文献，サイト
-### 4004関連
+### 4004関連開発事例
 - https://www.4004.com/
+  - https://www.4004.com/busicom-replica.html
+  - http://www.4004.com/2009/Busicom-141PF-Calculator_asm_rel-1-0-1.txt
 - https://github.com/jim11662418/4004-SBC
 - https://github.com/novi/4004MainBoard
+
+### データシート等
+- http://www.bitsavers.org/components/intel/
+- https://www.intel-vintage.info/intelmcs.htm
 
 ### 開発環境
 - http://john.ccac.rwth-aachen.de:8000/as/ (マクロアセンブラ)
