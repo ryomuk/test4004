@@ -32,7 +32,9 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
   - https://www.4004.com/busicom-replica.html
   - http://www.4004.com/2009/Busicom-141PF-Calculator_asm_rel-1-0-1.txt
 - https://github.com/jim11662418/4004-SBC
+- https://www.cpushack.com/mcs-4-test-boards-for-sale/
 - https://github.com/novi/4004MainBoard
+
 
 ### データシート
 - http://www.bitsavers.org/components/intel/
