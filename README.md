@@ -28,7 +28,7 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 
 ## 参考にした文献，サイト
 ### 4004関連開発事例
-- https://www.4004.com/
+- [Intel 4004  50th Anniversary Project](https://www.4004.com/)
   - https://www.4004.com/busicom-replica.html
   - http://www.4004.com/2009/Busicom-141PF-Calculator_asm_rel-1-0-1.txt
 - https://github.com/jim11662418/4004-SBC
