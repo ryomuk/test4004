@@ -4,7 +4,7 @@ BIN=$(PRG).bin
 PFILE=$(PRG).p
 LFILE=$(PRG).lst
 
-SRC=$(PRG).asm uart.inc 9600bps.inc config.inc aliases.inc
+SRC=$(PRG).asm 9600bps.inc
 
 # INCDIR=../include
 #ASM=asl -L -i $(INCDIR)

@@ -1,72 +1,92 @@
-;;; Tiny Monitor Program for 4004 evaluation board
-;;; Ryo Mukai
-;;; 2023/02/15
+;;;---------------------------------------------------------------------------
+;;; Tiny Monitor with calculator program for 4004 evaluation board
+;;; by Ryo Mukai
+;;; 2023/02/16
+;;;---------------------------------------------------------------------------
 
-;;; DEBUG equ 1			; for ifdef DEBUG
-
+;;;---------------------------------------------------------------------------
 ;;; This source can be assembled with the Macroassembler AS
 ;;; (http://john.ccac.rwth-aachen.de:8000/as/)
-        cpu 4004        ; AS's command to specify CPU
-
-        include "aliases.inc" ; Aliases for register name
-        include "config.inc"  ; Configuration of memory/port chips
-                
 ;;;---------------------------------------------------------------------------
-;;; CPU Resisters
-;;;---------------------------------------------------------------------------
-;;; P0( R0,  R1): argument of PRINT_P0, and many functions
-;;; P1( R2,  R3): argument of PUTCHAR_P1, DISPLED_P1
-;;;               result of GETCHAR_P1
-;;;               PM_WRITE_P0_P1, and many functions
-;;; P2( R4,  R5): CTOI_P1_R5, PM_READ_P0_P2
-;;; P3( R6,  R7): working reg. for calculator input (error flag, digit counter)
-;;; P4( R8,  R9):
-;;; P5(R10, R11): 
-;;; P6(R12, R13): working regs. for loop (wait , UART, etc.), and for SRC
-;;; P7(R14, R15): working regs. for loop (wait , UART, etc.), and for SRC
+;;; Conditional jumps syntax for Macroassembler AS:
+;;; JCN T     jump if TEST = 0 - most positive voltage or +5V
+;;; JCN TN    jump if TEST = 1 - most negative voltage or -10V
+;;; JCN C     jump if carry = 1
+;;; JCN CN    jump if carry = 0
+;;; JCN Z     jump if accumulator = 0
+;;; JCN ZN    jump if accumulator != 0
 ;;;---------------------------------------------------------------------------
 
-;;;---------------------------------------------------------------------------
-;;; Memory Resisters
-;;;---------------------------------------------------------------------------
-;;; Bank0, Chip 0
-;;; Reg 0(D0-F, S0-3): REG_X
-;;; Reg 1(D0-F, S0-3): REG_Y
-;;; Reg 2(D0-F, S0-3): REG_Z (not implemented yet)
-;;; Reg 3(D0-F, S0-3): REG_T (not implemented yet)
-;;;---------------------------------------------------------------------------
-;;; Bank0, Chip 1
-;;; Reg 0(D0-F, S0-3): REG_M (working for multiplication/division)
-;;; Reg 1(D0-F, S0-3): REG_A (working for square root) (not implemented yet)
-;;; Reg 2(D0-F, S0-3): REG_XI (working for square root) (not implemented yet)
-;;; Reg 3(D0-F, S0-3): REG_H (working for square root) (not implemented yet)
-;;;---------------------------------------------------------------------------
-;;; Bank1, Chip 0
-;;;---------------------------------------------------------------------------
-;;; Bank1, Chip 1
-;;;---------------------------------------------------------------------------
+	cpu 4004        ; AS's command to specify CPU
 
 ;;;---------------------------------------------------------------------------
-;;; Number expression (simple floating point)
-;;;       1 11111
-;;; char# 5 432109876543210
-;;;  (+/-)D.DDDDDDDDDDDDDDD*(10^E)
-;;; D0-15: Fraction (D15=most significant digit, D0=least significant digit)
-;;; D15 denotes an integer part, but it shuld be zero except
-;;; while calculating addition or multiplication.
-;;; It is used for avoiding overflow.
-;;; The number is normalized so that D15 is zero and minimize exponent
-;;; S0: Exponent (0 to 14)
-;;; S1: Sign of the fraction (0=positive, 15=negative)
-;;; S2: Error (0:no_error, 1:overflow, 2:divide_by_zero)
+;;; function for label to address for FIM&FIN
 ;;;---------------------------------------------------------------------------
-REG_ERROR_OVERFLOW  equ 1
-REG_ERROR_DIVBYZERO equ 2
-	
+
+lo     	function x, ((x)&255)
+
+;;;---------------------------------------------------------------------------
+;;; functuon for setting counter for ISZ loop
+;;;---------------------------------------------------------------------------
+
+loop 	function x, (16-(x))
+loops   function x,y, ((16-(x))<<4 + (16-(y)))
+
+;;;---------------------------------------------------------------------------
+;;; Alias for Registers and Register Pairs
+;;;---------------------------------------------------------------------------
+
+;;; Registers
+R10	reg RA
+R11     reg RB
+R12     reg RC
+R13 	reg RD
+R14     reg RE
+R15     reg RF
+
+;;; Register Pairs
+P0      reg R0R1
+P1      reg R2R3
+P2      reg R4R5
+P3      reg R6R7
+P4      reg R8R9
+P5      reg RARB
+P6      reg RCRD
+P7      reg RERF
+R10R11  reg RARB
+R12R13  reg RCRD
+R14R15  reg RERF
+
+;;;---------------------------------------------------------------------------
+;;; Hardware Configuration
+;;;---------------------------------------------------------------------------
+
+;;; BANK# for DCL
+BANK_RAM0	equ 0
+BANK_RAM1      	equ 0
+BANK_RAM2      	equ 1
+BANK_RAM3      	equ 1
+
+;;; CHIP#=(D7.D6.000000)
+CHIP_RAM0      	equ 00H
+CHIP_RAM1      	equ 40H
+CHIP_RAM2      	equ 00H
+CHIP_RAM3      	equ 40H
+
+;;; Serial Port (BANK# and CHIP#)
+BANK_SERIAL     equ BANK_RAM0
+CHIP_SERIAL     equ CHIP_RAM0
+
+;;; Program Memory
+PM_TOP          equ 0F00H
+PM_READ_P0_P2   equ 0FFEH
+
+;;; Default Bank
+BANK_DEFAULT	equ BANK_RAM0
+		
 ;;;---------------------------------------------------------------------------
 ;;; Program Start
 ;;;---------------------------------------------------------------------------
-
 	org 0000H		; beginning of Program Memory
 
 MAIN:
@@ -113,32 +133,32 @@ L_CR:
 	JUN CMD_LOOP
 
 L0:
-	FIM P0, 'r'		; Read data memory
+	FIM P0, 'd'		; dump data memory
 	JMS CMP_P0P1
 	JCN ZN, L1
 	JMS SETBANKCHIP_P5
-	JUN COMMAND_R
+	JUN COMMAND_D
 L1:
-	FIM P0, 'w'		; Write to data memory
+	FIM P0, 'w'		; write to data memory
 	JMS CMP_P0P1
 	JCN ZN, L2
 	JMS SETBANKCHIP_P5
 	JUN COMMAND_W
 L2:
-	FIM P0, 'p'		; write Program memory
+	FIM P0, 'D'		; Dump program memory
 	JMS CMP_P0P1
 	JCN ZN, L3
-	JUN COMMAND_P
+	JUN COMMAND_DP
 L3:
-	FIM P0, 'd'		; Dump program memory
+	FIM P0, 'W'		; Write Program memory
 	JMS CMP_P0P1
 	JCN ZN, L4
-	JUN COMMAND_D
+	JUN COMMAND_WP
 L4:
-	FIM P0, 'l'		; cLear program memory
+	FIM P0, 'C'		; Clear program memory
 	JMS CMP_P0P1
 	JCN ZN, L5
-	JUN COMMAND_L
+	JUN COMMAND_CL
 L5:
 	FIM P0, 'g'		; Go to PM_TOP (0F00H)
 	JMS CMP_P0P1
@@ -209,7 +229,7 @@ CMP_EXIT11
 	BBL 1			;P0>P1,  ACC=1, CY=1
 	
 ;;;---------------------------------------------------------------------------
-;;; PM_WRITE_PO_P1
+;;; PM_WRITE_P0_P1
 ;;; Write to program memory located at Page 15 (0F00H-0FFFH)
 ;;; (0F00H+P0) = P1
 ;;; input: P0, P1
@@ -237,132 +257,279 @@ PM_WRITE_READROUTINE:
 	JMS PM_WRITE_P0_P1
 	BBL 0
 
+;;;---------------------------------------------------------------------------
+;;; Monitor commands located in page 0100H
+;;;---------------------------------------------------------------------------
 	org 0100H
 ;;;---------------------------------------------------------------------------
-;;;COMMAND_C
-;;; 	Calculator
-;;; P0(R0, R1): working for PRINT
-;;; P1(R2, R3): working for PRINT, GETCHAR, PUTCHAR
-;;; P2(R4, R5): working for CTOI
-;;; P3(R6, R7):   
-;;; 		  R6.bit0 = input start flag (0:not started, 1:started)
-;;;               R6.bit1 = input full flag (0:not full, 1:full)
-;;; 	          R6.bit3 = digit point flag(0:no dp, 1:dp set)
-;;; 	          R7=digit counter for key input
-;;; P4(R8,  R9):  register address and character index(mainly REG_X)
-;;; P5(R10, R11): register address and character index(mainly REG_Y)
-;;; P6(R12, R13): working for register operation
-;;; P7(R14, R15): working for register operation
+;;; COMMAND_D
+;;; Dump Data RAM
+;;; input:
+;;; 	R10: #bank
+;;; 	R11: #chip (D3.D2.0.0)
+;;; working memory:
+;;;     P0(R0R1): working for PRINT_P0
+;;;     P1(R2R3): working for PUTCHAR_P1, PRINT_ACC
+;;;     R4: loop counter for #REG (0.0.D1.D0)
+;;;     R5: working for input
+;;;     R6: working for SCR (R6=R11+R4)
+;;;     R7: working for SCR #CHARACTER (D3.D2.D1.D0)@X3 (loop counter)
+;;;         SCR R6R7
+;;; 	R11: #CHIP (D3.D2.0.0)@X2
+;;;     P6(R12R13): working for uart
+;;;     P7(R14R15): working for uart
 ;;;---------------------------------------------------------------------------
-COMMAND_C:
-	FIM P0, lo(STR_CALC)
-	JMS PRINT_P0
+COMMAND_D:
+	;; PRINT 4 registers
+	LDM loop(4)		; 4 regs
+	XCH R4			; R4=loop(4)
 
-	JUN CMDC_CLEAR		; clear registers
-CMDC_LOOP_START:
-	FIM P3, 01H		; clear start, full, point flags
-				; and set digit counter R7 1
-	JUN PRINT_RESULT_AND_ENTER_TO_Y ; this may be modified
-					; when REG_Z or REG_T exists
-CMDC_LOOP_NUMIN:
-	JMS GETCHAR_P1
-        JMS DISPLED_ACC
-        JMS DISPLED_P1
-	FIM P0, '\r'
-	JMS CMP_P0P1
-	JCN Z, CMDC_LOOP_NUMIN	; skip CR
-
-	FIM P0, '\n'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L1
-	JMS PRINT_CRLF
-	JUN CMDC_ENTER
-CMDC_L1:
-	FIM P0, 'q'		; quit
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L2
-	JMS PRINT_CRLF
-	JUN CMD_LOOP		; return to command loop
-CMDC_L2:	
-	FIM P0, '+'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L3
-	JMS PUTCHAR_P1
-	JUN CMDC_ADD
-CMDC_L3:
-	FIM P0, '-'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L4
-	JMS PUTCHAR_P1
-	JUN CMDC_SUB
-CMDC_L4:
-	FIM P0, '*'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L5
-	JMS PUTCHAR_P1
-	JUN CMDC_MUL
-CMDC_L5:
-	FIM P0, '/'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L6
-	JMS PUTCHAR_P1
-	JUN CMDC_DIV
-CMDC_L6:
-	FIM P0, 'c'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L7
-	JMS PRINT_CRLF
-	JUN CMDC_CLEAR
-CMDC_L7:
-	FIM P0, 's'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L8
-	;; change sign of REG_X
-	JMS CHANGE_SIGN_REG_X
-	JMS PRINT_CRLF
-	JUN CMDC_PRINT
-CMDC_L8:
-	FIM P0, 'p'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L9
-	JMS PRINT_CRLF
-	JUN CMDC_PRINT
-CMDC_L9:
-	LD R6			; check R6.bit1
-	RAR			; no more '0-9' or '.' input
-	RAR			; when register is full (has 16 digits)
-	JCN C, CMDC_L11
-
-	FIM P0, '.'
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L10
-	JMS CMDC_CLEAR_REGX_IF_FIRST_KEYIN
-	JUN CMDC_DIGITPOINT
+	;; PRINT 16 characters
+CMDD_L1:
+	LDM loop(16)		; 16 characters
+	XCH R7			; R7=D3D2D1D0@X3 (#character)
+CMDD_L2:
+	CLB
+	LDM 4
+	ADD R4		;ACC<-#reg (D1D0@X2)(00, 01, 10, 11 for each loop)
+	CLC
+	ADD R11
+	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
 	
-CMDC_L10:
-	JMS ISNUM_P1
-	JCN Z, CMDC_L11          ; not a number
-	JMS CMDC_CLEAR_REGX_IF_FIRST_KEYIN
-	JUN CMDC_NUM
-CMDC_L11:
-	JUN CMDC_LOOP_NUMIN
+	SRC R6R7	; set address
+	RDM		; read data memory
+	JMS PRINT_ACC
+	ISZ R7,CMDD_L2
+
+	;; PRINT STATUS 
+	FIM P1, ':'
+	JMS PUTCHAR_P1
+	SRC R6R7	; set address
+	RD0
+	JMS PRINT_ACC
+	SRC R6R7	; set address
+	RD1
+	JMS PRINT_ACC
+	SRC R6R7	; set address
+	RD2
+	JMS PRINT_ACC
+	SRC R6R7	; set address
+	RD3
+	JMS PRINT_ACC
+	JMS PRINT_CRLF
+
+	ISZ R4,CMDD_L1
+	JUN CMD_LOOP		; return to command loop
+	
+;;;---------------------------------------------------------------------------
+;;; COMMAND_W:
+;;; Write Data RAM
+;;; input:
+;;; 	R10: #bank
+;;; 	R11: #chip (D3.D2.0.0)
+;;;---------------------------------------------------------------------------
+COMMAND_W:
+	;; PRINT 4 registers
+	LDM loop(4)		; 4 regs
+	XCH R4			; R4=loop(4)
+
+	;; PRINT 16 characters
+CMDW_L1:
+	LDM loop(16)		; 16 characters
+	XCH R7			; R7=D3D2D1D0@X3 (#character)
+CMDW_L2:
+	CLB
+	LDM 4
+	ADD R4		;ACC<-#reg (D1D0@X2)(00, 01, 10, 11 for each loop)
+	CLC
+	ADD R11
+	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
+
+	JMS GETCHAR_P1
+	JMS CTOI_P1_R5
+
+	SRC R6R7	; set address
+	LD R5
+	WRM			; write to memory
+	JMS PRINT_ACC
+	ISZ R7,CMDW_L2
+
+	;; PRINT STATUS 
+	FIM P1, ':'
+	JMS PUTCHAR_P1
+
+	JMS GETCHAR_P1
+	JMS CTOI_P1_R5
+
+	SRC R6R7	; set address
+	LD R5
+	WR0
+	JMS PRINT_ACC
+
+	JMS GETCHAR_P1
+	JMS CTOI_P1_R5
+
+	SRC R6R7	; set address
+	LD R5
+	WR1
+	JMS PRINT_ACC
+
+	JMS GETCHAR_P1
+	JMS CTOI_P1_R5
+
+	SRC R6R7	; set address
+	LD R5
+	WR2
+	JMS PRINT_ACC
+
+	JMS GETCHAR_P1
+	JMS CTOI_P1_R5
+
+	SRC R6R7	; set address
+	LD R5
+	WR3
+	JMS PRINT_ACC
+	JMS PRINT_CRLF
+
+	ISZ R4,CMDW_L1
+	
+	JUN CMD_LOOP		; return to command loop
 
 ;;;---------------------------------------------------------------------------
-;;; CMDC_CLEAR_REGX_IF_FIRST_KEYIN
-;;;   clear REG_X for the first '0-9' or '.'
+;;; COMMAND_WP
+;;; Write Program Memory
 ;;;---------------------------------------------------------------------------
-CMDC_CLEAR_REGX_IF_FIRST_KEYIN:
-	LD R6                   ; check input already started (R6.bit0)
-	RAR
-	JCN C, FKEY_EXIT
-	STC
-	RAL			; set input start flag
-	XCH R6
-	FIM P0, REG_X
-	JMS CLEAR_REGISTER_P0	; clear X for the first keyin
-FKEY_EXIT:
-	BBL 0
+COMMAND_WP:
+	FIM P0, lo(STR_ADD)	; print " ADD="
+	JMS PRINT_P0
+	JMS GETCHAR_P1
+	JMS PUTCHAR_P1
+	JMS CTOI_P1_R5
+	JMS PRINT_CRLF
 
+	FIM P1,'F'
+	JMS PUTCHAR_P1
+	LD R5
+	JMS PRINT_ACC
+	FIM P1,'0'
+	JMS PUTCHAR_P1
+	FIM P1,':'
+	JMS PUTCHAR_P1
+	
+	LD R5
+	XCH R0
+
+	LDM 0
+	XCH R1
+CMDWP_L1:
+	FIM P1, ' '
+	JMS PUTCHAR_P1
+
+	JMS GETCHAR_P1
+	JMS PUTCHAR_P1
+	JMS CTOI_P1_R5
+	LD R5
+	XCH R4
+
+	JMS GETCHAR_P1
+	JMS PUTCHAR_P1
+	JMS CTOI_P1_R5
+	LD R5
+	XCH R3
+
+	LD R4
+	XCH R2
+
+	JMS PM_WRITE_P0_P1
+	ISZ R1, CMDWP_L1
+
+	JMS PRINT_CRLF
+
+	JUN CMD_LOOP		; return to command loop
+
+;;;---------------------------------------------------------------------------
+;;; COMMAND_DP
+;;; Dump Program Memory
+;;;---------------------------------------------------------------------------
+COMMAND_DP:
+	JMS PRINT_CRLF
+
+	JMS PM_WRITE_READROUTINE
+
+	FIM P0, 00H
+CMDDP_L0:
+	FIM P1,'F'
+	JMS PUTCHAR_P1
+	LD R0
+	JMS PRINT_ACC
+	FIM P1,'0'
+	JMS PUTCHAR_P1
+	FIM P1,':'
+	JMS PUTCHAR_P1
+CMDDP_L1:	
+	FIM P1, ' '
+	JMS PUTCHAR_P1
+
+	JMS PM_READ_P0_P2	; Read program memory
+	LD R4
+	JMS PRINT_ACC
+	LD R5
+	JMS PRINT_ACC
+
+	ISZ R1, CMDDP_L1
+	JMS PRINT_CRLF
+        ISZ R0, CMDDP_L0
+	
+	JUN CMD_LOOP		; return to command loop
+
+;;;---------------------------------------------------------------------------
+;;; COMMAND_CL
+;;; Clear Program Memory
+;;;---------------------------------------------------------------------------
+COMMAND_CL:
+	JMS PRINT_CRLF
+
+	FIM P0, 00H
+	FIM P1, 00H
+CMDCL_L1:
+	JMS PM_WRITE_P0_P1
+	ISZ R1, CMDCL_L1
+	ISZ R0, CMDCL_L1
+	
+	JUN CMD_LOOP		; return to command loop
+
+;;;---------------------------------------------------------------------------
+;;; COMMAND_G
+;;; Go to Top of Program memory PM_TOP(0x0F00)
+;;;---------------------------------------------------------------------------
+COMMAND_G:
+	JMS PRINT_CRLF
+	JMS PM_TOP
+	JUN CMD_LOOP		; return to command loop
+
+;;;---------------------------------------------------------------------------
+;;; Program for the Calculator Mode
+;;;---------------------------------------------------------------------------
+	org 0200H
+;;;---------------------------------------------------------------------------
+;;; Memory Resisters used in the calculator mode
+;;;---------------------------------------------------------------------------
+;;; Bank0, Chip 0
+;;; Reg 0(D0-F, S0-3): REG_X
+;;; Reg 1(D0-F, S0-3): REG_Y
+;;; Reg 2(D0-F, S0-3): REG_Z (not implemented yet)
+;;; Reg 3(D0-F, S0-3): REG_T (not implemented yet)
+;;;---------------------------------------------------------------------------
+;;; Bank0, Chip 1
+;;; Reg 0(D0-F, S0-3): REG_M (working for multiplication/division)
+;;; Reg 1(D0-F, S0-3): REG_A (working for square root) (not implemented yet)
+;;; Reg 2(D0-F, S0-3): REG_XI (working for square root) (not implemented yet)
+;;; Reg 3(D0-F, S0-3): REG_H (working for square root) (not implemented yet)
+;;;---------------------------------------------------------------------------
+;;; Bank1, Chip 0
+;;;---------------------------------------------------------------------------
+;;; Bank1, Chip 1
+;;;---------------------------------------------------------------------------
 ;;;---------------------------------------------------------------------------
 ;;; CHIP#(=D7.D6), REG#(=D5.D4) of number registers 
 ;;;---------------------------------------------------------------------------
@@ -375,35 +542,234 @@ REG_M	equ (CHIP_RAM1+(0<<4))	; CHIP#.00.0000
 REG_A	equ (CHIP_RAM1+(1<<4))	; CHIP#.01.0000
 REG_XI	equ (CHIP_RAM1+(2<<4))	; CHIP#.10.0000
 REG_H	equ (CHIP_RAM1+(3<<4))	; CHIP#.11.0000
+
+;;;---------------------------------------------------------------------------
+;;; Number expression (simple floating point)
+;;;       1 11111
+;;; char# 5 432109876543210
+;;;  (+/-)D.DDDDDDDDDDDDDDD*(10^E)
+;;; D0-15: Fraction (D15=most significant digit, D0=least significant digit)
+;;; D15 denotes an integer part, but it shuld be zero except
+;;; while calculating addition or multiplication.
+;;; It is used for avoiding overflow.
+;;; The number is normalized so that D15 is zero and minimize exponent
+;;; S0: Exponent (0 to 14)
+;;; S1: Sign of the fraction (0=positive, 15=negative)
+;;; S2: Error (0:no_error, 1:overflow, 2:divide_by_zero)
+;;;---------------------------------------------------------------------------
+
+; Error flags
+REG_ERROR_OVERFLOW  equ 1
+REG_ERROR_DIVBYZERO equ 2
 	
 ;;;---------------------------------------------------------------------------
-;;; CMDC_CLEAR
-;;; clear registers and jump to main loop of the calculator
+;;;COMMAND_C
+;;; 	Calculator
+;;; P0(R0, R1): working for PRINT
+;;; P1(R2, R3): working for PRINT, GETCHAR, PUTCHAR
+;;; P2(R4, R5): working for CTOI
+;;; P3(R6, R7):   
+;;; 		  R6.bit0 = automatic ENTER flag (0:desable , 1:enable)
+;;;               R6.bit1 = input full flag (0:not full, 1:full)
+;;; 	          R6.bit3 = digit point flag(0:no dp, 1:dp set)
+;;; 	          R7=digit counter for key input
+;;; 		  REG_X is automatically cleared if R7 is 0 (first digit input)
+;;; P4(R8,  R9):  register address and character index(mainly REG_X)
+;;; P5(R10, R11): register address and character index(mainly REG_Y)
+;;; P6(R12, R13): working for register operation
+;;; P7(R14, R15): working for register operation
 ;;;---------------------------------------------------------------------------
-CMDC_CLEAR:
+COMMAND_C:
+	FIM P0, lo(STR_CALC)
+	JMS PRINT_P0
+
+	JMS CMDC_CLEAR		; clear registers
+
+CMDC_START:
+	LD R6
+	RAR
+	LDM 0
+	RAL
+	XCH R6			; reset flags except for automatic ENTER flag
+	CLB
+	XCH R7			; set digit counter = 0
 	FIM P0, REG_X
-	JMS CLEAR_REGISTER_P0
-	FIM P0, REG_Y
-	JMS CLEAR_REGISTER_P0
-	JUN CMDC_LOOP_START
+	JMS PRINT_REGISTER_P0	; print REG_X
+	
+CMDC_LOOP:		; loop for input digits to REG_X
+	JMS GETCHAR_P1
+        JMS DISPLED_ACC
+        JMS DISPLED_P1
+	FIM P0, '\r'
+	JMS CMP_P0P1
+	JCN Z, CMDC_LOOP	; skip CR
+
+	FIM P0, '\n'		; 'ENTER' key
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L1
+	JMS PRINT_CRLF
+	JMS CMDC_ENTER
+	JUN CMDC_START
+CMDC_L1:
+	FIM P0, 'q'		; quit
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L2
+	JMS PRINT_CRLF
+	JUN CMD_LOOP		; return to command loop
+CMDC_L2:	
+	FIM P0, '+'		; '+' key
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L3
+	JMS PUTCHAR_P1
+	JMS PRINT_CRLF
+	JMS CMDC_ADD
+	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
+	JUN CMDC_START
+CMDC_L3:
+	FIM P0, '-'		; '-' key
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L4
+	JMS PUTCHAR_P1
+	JMS PRINT_CRLF
+	JMS CMDC_SUB
+	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
+	JUN CMDC_START
+CMDC_L4:
+	FIM P0, '*'		; '*' key
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L5
+	JMS PUTCHAR_P1
+	JMS PRINT_CRLF
+	JMS CMDC_MUL
+	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
+	JUN CMDC_START
+CMDC_L5:
+	FIM P0, '/'		; '/' key
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L6
+	JMS PUTCHAR_P1
+	JMS PRINT_CRLF
+	JMS CMDC_DIV
+	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
+	JUN CMDC_START
+CMDC_L6:
+	FIM P0, 'c'		; clear
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L7
+	JMS PRINT_CRLF
+	JMS CMDC_CLEAR
+	JUN CMDC_START
+CMDC_L7:
+	FIM P0, 's'		; sign change
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L8
+
+	JMS CHANGE_SIGN_REG_X
+	JMS PRINT_CRLF
+	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
+	JUN CMDC_START
+CMDC_L8:
+	FIM P0, 'p'		; print registers
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L81
+	JMS PRINT_CRLF
+	JMS CMDC_PRINT
+	JUN CMDC_START
+CMDC_L81:
+	FIM P0, 'r'		; square root
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L9
+	JMS PRINT_CRLF
+	JMS CMDC_SQUAREROOT
+	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
+	JUN CMDC_START
+CMDC_L9:
+	LD R6			; check number full flag (R6.bit1)
+	RAR			; no more '0-9' or '.' input
+	RAR
+	JCN C, CMDC_L11
+
+	FIM P0, '.'		; '.' digit point
+	JMS CMP_P0P1
+	JCN ZN, CMDC_L10
+	JMS CMDC_AUTOMATIC_PUSH_AND_CLEAR
+	JMS CMDC_DIGITPOINT
+	JUN CMDC_LOOP
+	
+CMDC_L10:
+	JMS ISNUM_P1
+	JCN Z, CMDC_L11          ; skip if not a number
+	JMS CMDC_AUTOMATIC_PUSH_AND_CLEAR
+	JMS CMDC_NUM
+CMDC_L11:
+	JUN CMDC_LOOP
+
+;;;---------------------------------------------------------------------------
+;;; ISNUM_P1
+;;; check P1 '0' to '9' as a ascii character
+;;; return: ACC=0 if P1 is not a number
+;;;         ACC=1 if P1 is a number
+;;; destroy: P0
+;;;---------------------------------------------------------------------------
+ISNUM_P1:
+	FIM P0, '0'-1
+	JMS CMP_P0P1
+	JCN C, ISNUM_FALSE	; '0'-1 >= P1
+	FIM P0, '9'
+	JMS CMP_P0P1
+	JCN CN, ISNUM_FALSE	; '9' < P1
+	BBL 1			; P1 is a number
+ISNUM_FALSE:
+	BBL 0			; P1 is not a number
 	
 ;;;---------------------------------------------------------------------------
-;;; CMDC_ENTER
-;;; LOAD Y <= X
+;;; CMDC_SET_AUTOMATIC_ENTER_FLAG
+;;;  set automatic ENTER flag
 ;;;---------------------------------------------------------------------------
-CMDC_ENTER:
- 	FIM P0, REG_X
- 	JMS NORMALIZE_REGISTER_P0
-	FIM P6, REG_Y
-	FIM P7, REG_X
-	JMS LD_REGISTER_P6_P7	; Y<=X
- 	JUN CMDC_LOOP_START
+CMDC_SET_AUTOMATIC_ENTER_FLAG:	
+	LD R6
+	RAR
+	STC
+	RAL
+	XCH R6
+	BBL 0
+
+;;;---------------------------------------------------------------------------
+;;; CMDC_CLEAR_AUTOMATIC_ENTER_FLAG
+;;; clear automatic ENTER flag
+;;;---------------------------------------------------------------------------
+CMDC_CLEAR_AUTOMATIC_ENTER_FLAG:
+	LD R6
+	RAR
+	CLC
+	RAL
+	XCH R6
+	BBL 0
+
+;;;---------------------------------------------------------------------------
+;;; CMDC_AUTOMATIC_PUSH_AND_CLEAR
+;;;   push REG_X and clear for the first '0-9' or '.' after operation
+;;;---------------------------------------------------------------------------
+CMDC_AUTOMATIC_PUSH_AND_CLEAR:
+	LD R6                   ; check automatic ENTER flag (R6.bit0)
+	RAR
+	JCN CN, CMDC_PUSH_L0
+	JMS CMDC_ENTER		; push ENTER key
+
+CMDC_PUSH_L0:
+	LD R7                   ; check digit count
+	JCN ZN,CMDC_PUSH_EXIT	; if R7 = 0 then R7++ and clear REG_X
+	INC R7
+	FIM P0, REG_X
+	JMS CLEAR_REGISTER_P0	; clear X for the first keyin
+CMDC_PUSH_EXIT
+	BBL 0
 
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_DIGITPOINT
 ;;; set a digit point
 ;;;---------------------------------------------------------------------------
-CMDC_DIGITPOINT
+CMDC_DIGITPOINT:
 	LD R6
 	RAL
 	JCN C, CMDC_DP_EXIT	; skip if digit point flag (R6.bit3)
@@ -414,24 +780,58 @@ CMDC_DIGITPOINT
 
 	JMS PUTCHAR_P1		; put '.'
 CMDC_DP_EXIT:	
-	JUN CMDC_LOOP_NUMIN
+	BBL 0
+;;;---------------------------------------------------------------------------
+;;; CMDC_CLEAR
+;;; clear all registers
+;;;---------------------------------------------------------------------------
+CMDC_CLEAR:
+	FIM P0, REG_X
+	JMS CLEAR_REGISTER_P0
+	FIM P0, REG_Y
+	JMS CLEAR_REGISTER_P0
+	FIM P0, REG_Z
+	JMS CLEAR_REGISTER_P0
+	FIM P0, REG_T
+	JMS CLEAR_REGISTER_P0
 
+	JUN CMDC_CLEAR_AUTOMATIC_ENTER_FLAG ; clear flag and return
+	
+;;;---------------------------------------------------------------------------
+;;; CMDC_ENTER
+;;; Push register stack
+;;; 	X=>Y=>Z=>T
+;;;---------------------------------------------------------------------------
+CMDC_ENTER:
+	FIM P6, REG_T
+	FIM P7, REG_Z
+	JMS LD_REGISTER_P6_P7	; T<=Z
+	FIM P6, REG_Z
+	FIM P7, REG_Y
+	JMS LD_REGISTER_P6_P7	; Z<=Y
+	FIM P6, REG_Y
+	FIM P7, REG_X
+	JMS LD_REGISTER_P6_P7	; Y<=X
+
+	JUN CMDC_CLEAR_AUTOMATIC_ENTER_FLAG ; clear flag and return
+	
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_NUM
 ;;; enter a number to X
+;;; input: P1=('0', ...'9') ASCII character
+;;;        R7=digit count
 ;;;---------------------------------------------------------------------------
 CMDC_NUM:
 	JMS CTOI_P1_R5
-	LD R6			; check digit point flag (R6.bit3)
-	RAL
-	JCN C,CMDC_L0		; digit point flag is ture
-	
-	LD R5			; when digit point frag is false,
-	JCN NZ, CMDC_L0		; ignore key in '0' if digit counter is 1
-	LD R7		
-	DAC
-	JCN Z, CMDC_NUM_EXIT
-CMDC_L0:
+	;; 	LD R6			; check digit point flag (R6.bit3)
+	;; 	RAL
+	;; 	JCN C,CMDC_NUM_L1	; digit point flag is ture
+	;; 	LD R5			; when digit point frag is false,
+	;; 	JCN NZ, CMDC_NUM_L1	; ignore key in '0' if digit counter is 1
+	;; 	LD R7		
+	;; 	DAC
+	;; 	JCN Z, CMDC_NUM_EXIT
+	;; CMDC_NUM_L1:
 	;; operation is for R7-th digit of X
 	FIM P7, REG_X
 	LDM 15
@@ -442,7 +842,7 @@ CMDC_L0:
 
 	LD R6
 	RAL			; check R6.bit3 (dp flag)
-	JCN C, CMDC_SETNUM	; not set exponent
+	JCN C, CMDC_SETNUM	; if dp flag is true, exponent is not updated
 	;; set exponent of X
 	LD R7
 	WR0
@@ -464,49 +864,13 @@ CMDC_SETNUM:
 	XCH R6
 CMDC_NUM_EXIT:
 	JMS PUTCHAR_P1		; echo input
-	JUN CMDC_LOOP_NUMIN
-
-;;;---------------------------------------------------------------------------
-;;; SUB_FRACTION_P6_P7
-;;; subtract fraction
-;;; REG(P6) = REG(P6) - REG(P7)
-;;; REG(P6) should be equal or larger than REG(P7)
-;;; in order to avoid underflow
-;;; destroy: R13, R15, (R12 and R14 are not affected)
-;;;---------------------------------------------------------------------------
-;;; Reference
-;;; "Intel MCS-4 Assembly Language Programming Manual" Dec.1973,
-;;; 4.8 Decimal Subtraction, pp.4-20--23
-;;;---------------------------------------------------------------------------
-SUB_FRACTION_P6_P7:
-	CLB
-	XCH R13
-	CLB
-	XCH R15
-	CLB
-	STC
-SUB_FRA_LOOP:
-	TCS
-	SRC P7
-	SBM
-
-	CLC
-	SRC P6
-	ADM
-
-	DAA
-	WRM
-	INC R13
-	ISZ R15, SUB_FRA_LOOP
 	BBL 0
 
-	org 0200H
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_ADD
 ;;; X = X + Y
 ;;;---------------------------------------------------------------------------
 CMDC_ADD:
-	JMS PRINT_CRLF
 	JMS ALIGN_REGISTER_XY
 
 	FIM P6, REG_X
@@ -558,16 +922,23 @@ CMDC_ADD_ZERO_EXIT:
 ;;; CMDC_NORMALIZE_AND_EXIT
 ;;; Common routine for finish calculation
 ;;; Normalize REG_X
-;;; Clear REG_Y
-;;; Rotate registers is to be implemented (for REG_Z or REG_T)
+;;; Pop registers
+;;; REG_Y<= REG_Z<=REG_T
 ;;;---------------------------------------------------------------------------
 CMDC_NORMALIZE_AND_EXIT:
  	FIM P0, REG_X
  	JMS NORMALIZE_REGISTER_P0
-	FIM P0, REG_Y
-	JMS CLEAR_REGISTER_P0
-	JUN CMDC_LOOP_START
 
+	FIM P6, REG_Y
+	FIM P7, REG_Z
+	JMS LD_REGISTER_P6_P7 	; Y<=Z
+
+	FIM P6, REG_Z
+	FIM P7, REG_T
+	JMS LD_REGISTER_P6_P7 	; Z<=T
+
+	BBL 0
+	
 ;;;---------------------------------------------------------------------------
 ;;; ADD_FRACTION_P6_P7
 ;;; Add fraction of two registers
@@ -594,6 +965,40 @@ ADD_FRA_LOOP:
 ADD_FRA_EXIT:	
 	BBL 0
 	
+;;;---------------------------------------------------------------------------
+;;; SUB_FRACTION_P6_P7
+;;; subtract fraction
+;;; REG(P6) = REG(P6) - REG(P7)
+;;; REG(P6) should be equal or larger than REG(P7)
+;;; in order to avoid underflow
+;;; destroy: R13, R15, (R12 and R14 are not affected)
+;;;---------------------------------------------------------------------------
+;;; Reference
+;;; "Intel MCS-4 Assembly Language Programming Manual" Dec.1973,
+;;; 4.8 Decimal Subtraction, pp.4-20--23
+;;;---------------------------------------------------------------------------
+SUB_FRACTION_P6_P7:
+	CLB
+	XCH R13
+	CLB
+	XCH R15
+	CLB
+	STC
+SUB_FRA_LOOP:
+	TCS
+	SRC P7
+	SBM
+
+	CLC
+	SRC P6
+	ADM
+
+	DAA
+	WRM
+	INC R13
+	ISZ R15, SUB_FRA_LOOP
+	BBL 0
+
 ;;;---------------------------------------------------------------------------
 ;;; CMP_FRACTION_P6_P7
 ;;; compare fraction of REG(P6) and REG(P7)
@@ -692,15 +1097,14 @@ NM_NOERROR:
 	LDM 1
 NM_EXIT:
 	JUN SHIFT_FRACTION_RIGHT_P0_ACC
-	
+
+	org 0400H
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_MUL
 ;;; X = X * Y
 ;;;---------------------------------------------------------------------------
 	
 CMDC_MUL:
-	JMS PRINT_CRLF
-
 	FIM P0, REG_X
 	JMS ISZERO_REGISTER_P0
 	JCN ZN, CMDC_MUL_ZERO
@@ -744,7 +1148,6 @@ CMDC_MUL_ZERO:
 	JMS CLEAR_REGISTER_P0
 	JUN CMDC_MUL_EXIT
 
-	org 0300H
 ;;;---------------------------------------------------------------------------
 ;;; MUL_FRACTION_XY
 ;;; multiply fraction of REG_X and REG_Y
@@ -808,28 +1211,34 @@ MUL_LOOP_NEXT:
 	BBL 0
 	
 ;;;---------------------------------------------------------------------------
+;;; CMDC_SQUAREROOT:
+;;;---------------------------------------------------------------------------
+CMDC_SQUAREROOT:
+	;;  to be implemented
+	FIM P0, REG_X
+	JMS CLEAR_REGISTER_P0
+	LDM 14
+	XCH R1
+	SRC P0
+	LDM 5
+	WRM
+	BBL 0
+
+;;;---------------------------------------------------------------------------
 ;;; CMDC_PRINT
 ;;; Print X and Y
 ;;;---------------------------------------------------------------------------
 CMDC_PRINT:
 	FIM P0, REG_X
-	JMS PRINT_REGISTER_P0
+	JMS PRINT_REGISTER_WITH_NAME_P0
 	FIM P0, REG_Y
-	JMS PRINT_REGISTER_P0
-	JUN CMDC_LOOP_NUMIN
+	JMS PRINT_REGISTER_WITH_NAME_P0
+	FIM P0, REG_Z
+	JMS PRINT_REGISTER_WITH_NAME_P0
+	FIM P0, REG_T
+	JMS PRINT_REGISTER_WITH_NAME_P0
+	BBL 0
 
-;;;---------------------------------------------------------------------------
-;;; PRINT_RESULT_AND_ENTER_TO_Y
-;;; Print REG_X as a result and ENTER to REG_Y
-;;;---------------------------------------------------------------------------
-PRINT_RESULT_AND_ENTER_TO_Y:
-	FIM P0, REG_X
-	FIM P6, REG_Y
-	FIM P7, REG_X
-	JMS LD_REGISTER_P6_P7	; Y<=X
-	JMS PRINT_REGISTER_P0
-	JUN CMDC_LOOP_NUMIN
-	
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_SUB
 ;;; X = Y - X
@@ -872,24 +1281,6 @@ SHIFTR_NEXT:
 SHIFTR_EXIT:
 	BBL 0
 
-;;;---------------------------------------------------------------------------
-;;; ISNUM_P1
-;;; check P1 '0' to '9' as a ascii character
-;;; return: ACC=0 if P1 is not a number
-;;;         ACC=1 if P1 is a number
-;;; destroy: P0
-;;;---------------------------------------------------------------------------
-ISNUM_P1:
-	FIM P0, '0'-1
-	JMS CMP_P0P1
-	JCN C, ISNUM_FALSE	; '0'-1 >= P1
-	FIM P0, '9'
-	JMS CMP_P0P1
-	JCN CN, ISNUM_FALSE	; '9' < P1
-	BBL 1			; P1 is a number
-ISNUM_FALSE:
-	BBL 0			; P1 is not a number
-	
 ;;;---------------------------------------------------------------------------
 ;;; SHIFT_FRACTION_LEFT_P0_ACC
 ;;; shift fraction of the register to left with filling 0
@@ -1075,14 +1466,11 @@ CHANGE_SIGN_REG_X:
 	WR1
 	BBL 0
 
-	org 0400H
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_DIV
 ;;; X = Y / X
 ;;;---------------------------------------------------------------------------
 CMDC_DIV:
-	JMS PRINT_CRLF
-
 	FIM P0, REG_X
 	JMS NORMALIZE_REGISTER_P0
 	JMS ISZERO_REGISTER_P0
@@ -1156,11 +1544,11 @@ CMDC_DIV_BY_ZERO:
 	SRC P0
 	LDM REG_ERROR_DIVBYZERO
 	WR2			; set error flag
-	JUN CMDC_LOOP_START
+	BBL 0
 CMDC_DIVIDEND_ZERO:
 	FIM P0, REG_X
 	JMS CLEAR_REGISTER_P0
-	JUN CMDC_LOOP_START
+	BBL 0
 	
 ;;;---------------------------------------------------------------------------
 ;;; DIV_FRACTION_XY
@@ -1256,18 +1644,26 @@ GET_SIGN_EXIT:
 	BBL 0
 
 ;;;---------------------------------------------------------------------------
+;;; PRINT_REGISTER_WITH_NAME_P0
+;;; Print the contents of the number register
+;;; input: P0(R0=D3D2D1D0 (D3D2=#CHIP, D1D0=#REG))
+;;; destroy P6, P7, P5(R10, R11), P1
+;;; output: ACC=0
+;;;---------------------------------------------------------------------------
+PRINT_REGISTER_WITH_NAME_P0:
+	FIM P1, 'X'
+	JMS PUTCHAR_P1
+	LD R0
+	JMS PRINT_ACC
+;;;---------------------------------------------------------------------------
 ;;; PRINT_REGISTER_P0
 ;;; Print the contents of the number register
 ;;; input: P0(R0=D3D2D1D0 (D3D2=#CHIP, D1D0=#REG))
 ;;; destroy P6, P7, P5(R10, R11), P1
 ;;; output: ACC=0
 ;;;---------------------------------------------------------------------------
-PRINT_REGISTER_P0:
-	;; 	FIM P1, 'X'
-	;; 	JMS PUTCHAR_P1
-	;; 	LD R0
-	;; 	JMS PRINT_ACC
 	;;
+PRINT_REGISTER_P0:
 	FIM P1, '='
 	SRC P0
 	RD2
@@ -1326,261 +1722,102 @@ PRINT_REGISTER_LOOP:
 PRINT_REGISTER_L1:
 	ISZ R11, PRINT_REGISTER_LOOP
 PRINT_EXIT:	
-	JMS PRINT_CRLF
+	JMS PRINT_CR		; not use PRINT_CRLF
+	JMS PRINT_LF		; to avoid consuming the stack 
 	BBL 0
-
-	
-;;;---------------------------------------------------------------------------
-;;; Monitor commands located in page 0500H
-;;;---------------------------------------------------------------------------
-	org 0500H
-;;;---------------------------------------------------------------------------
-;;; Read Data RAM
-;;; input:
-;;; 	R10: #bank
-;;; 	R11: #chip (D3.D2.0.0)
-;;; working memory:
-;;;     P0(R0R1): working for PRINT_P0
-;;;     P1(R2R3): working for PUTCHAR_P1, PRINT_ACC
-;;;     R4: loop counter for #REG (0.0.D1.D0)
-;;;     R5: working for input
-;;;     R6: working for SCR (R6=R11+R4)
-;;;     R7: working for SCR #CHARACTER (D3.D2.D1.D0)@X3 (loop counter)
-;;;         SCR R6R7
-;;;     R8: not used
-;;; 	R9: not used
-;;; 	R11: #CHIP (D3.D2.0.0)@X2
-;;;     P6(R12R13): working for uart
-;;;     P7(R14R15): working for uart
-;;;---------------------------------------------------------------------------
-COMMAND_R:
-	;; PRINT 4 registers
-	LDM loop(4)		; 4 regs
-	XCH R4			; R4=loop(4)
-
-	;; PRINT 16 characters
-CMDR_L1:
-	LDM loop(16)		; 16 characters
-	XCH R7			; R7=D3D2D1D0@X3 (#character)
-CMDR_L2:
-	CLB
-	LDM 4
-	ADD R4		;ACC<-#reg (D1D0@X2)(00, 01, 10, 11 for each loop)
-	CLC
-	ADD R11
-	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
-	
-	SRC R6R7	; set address
-	RDM		; read data memory
-	JMS PRINT_ACC
-	ISZ R7,CMDR_L2
-
-	;; PRINT STATUS 
-	FIM P1, ':'
-	JMS PUTCHAR_P1
-	SRC R6R7	; set address
-	RD0
-	JMS PRINT_ACC
-	SRC R6R7	; set address
-	RD1
-	JMS PRINT_ACC
-	SRC R6R7	; set address
-	RD2
-	JMS PRINT_ACC
-	SRC R6R7	; set address
-	RD3
-	JMS PRINT_ACC
-	JMS PRINT_CRLF
-
-	ISZ R4,CMDR_L1
-	JUN CMD_LOOP		; return to command loop
-	
-;;;---------------------------------------------------------------------------
-;;; Write Data RAM
-;;; input:
-;;; 	R10: #bank
-;;; 	R11: #chip (D3.D2.0.0)
-;;;---------------------------------------------------------------------------
-COMMAND_W:
-	;; PRINT 4 registers
-	LDM loop(4)		; 4 regs
-	XCH R4			; R4=loop(4)
-
-	;; PRINT 16 characters
-CMDW_L1:
-	LDM loop(16)		; 16 characters
-	XCH R7			; R7=D3D2D1D0@X3 (#character)
-CMDW_L2:
-	CLB
-	LDM 4
-	ADD R4		;ACC<-#reg (D1D0@X2)(00, 01, 10, 11 for each loop)
-	CLC
-	ADD R11
-	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
-
-	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
-
-	SRC R6R7	; set address
-	LD R5
-	WRM			; write to memory
-	JMS PRINT_ACC
-	ISZ R7,CMDW_L2
-
-	;; PRINT STATUS 
-	FIM P1, ':'
-	JMS PUTCHAR_P1
-
-	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
-
-	SRC R6R7	; set address
-	LD R5
-	WR0
-	JMS PRINT_ACC
-
-	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
-
-	SRC R6R7	; set address
-	LD R5
-	WR1
-	JMS PRINT_ACC
-
-	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
-
-	SRC R6R7	; set address
-	LD R5
-	WR2
-	JMS PRINT_ACC
-
-	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
-
-	SRC R6R7	; set address
-	LD R5
-	WR3
-	JMS PRINT_ACC
-	JMS PRINT_CRLF
-
-	ISZ R4,CMDW_L1
-	
-	JUN CMD_LOOP		; return to command loop
-
-COMMAND_P:	;; write program Memory
-	FIM P0, lo(STR_ADD)	; print " ADD="
-	JMS PRINT_P0
-	JMS GETCHAR_P1
-	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	JMS PRINT_CRLF
-
-	FIM P1,'F'
-	JMS PUTCHAR_P1
-	LD R5
-	JMS PRINT_ACC
-	FIM P1,'0'
-	JMS PUTCHAR_P1
-	FIM P1,':'
-	JMS PUTCHAR_P1
-	
-	LD R5
-	XCH R0
-
-	LDM 0
-	XCH R1
-CMDP_L1:
-	FIM P1, ' '
-	JMS PUTCHAR_P1
-
-	JMS GETCHAR_P1
-	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	LD R5
-	XCH R4
-
-	JMS GETCHAR_P1
-	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	LD R5
-	XCH R3
-
-	LD R4
-	XCH R2
-
-	JMS PM_WRITE_P0_P1
-	ISZ R1, CMDP_L1
-
-	JMS PRINT_CRLF
-
-	JUN CMD_LOOP		; return to command loop
-
-COMMAND_D:	;; Dump program Memory
-	JMS PRINT_CRLF
-
-	JMS PM_WRITE_READROUTINE
-
-	FIM P0, 00H
-CMDD_L0:
-	FIM P1,'F'
-	JMS PUTCHAR_P1
-	LD R0
-	JMS PRINT_ACC
-	FIM P1,'0'
-	JMS PUTCHAR_P1
-	FIM P1,':'
-	JMS PUTCHAR_P1
-CMDD_L1:	
-	FIM P1, ' '
-	JMS PUTCHAR_P1
-
-	JMS PM_READ_P0_P2	; Read program memory
-	LD R4
-	JMS PRINT_ACC
-	LD R5
-	JMS PRINT_ACC
-
-	ISZ R1, CMDD_L1
-	JMS PRINT_CRLF
-        ISZ R0, CMDD_L0
-	
-	JUN CMD_LOOP		; return to command loop
-
-	;; Clear Program Memory
-COMMAND_L:
-	JMS PRINT_CRLF
-
-	FIM P0, 00H
-	FIM P1, 00H
-CMDL_L1:
-	JMS PM_WRITE_P0_P1
-	ISZ R1, CMDL_L1
-	ISZ R0, CMDL_L1
-	
-	JUN CMD_LOOP		; return to command loop
-
-	;; Go to PM_TOP(0x0F00)
-COMMAND_G:
-	JMS PRINT_CRLF
-	JMS PM_TOP
-	JUN CMD_LOOP		; return to command loop
 
 ;;;----------------------------------------------------------------------------
 ;;; I/O routines located in Page 0600H
 ;;;----------------------------------------------------------------------------
 	org 0600H
-
-;;;----------------------------------------------------------------------------
+;;;---------------------------------------------------------------------------
+;;; Software UART Routine
 ;;; GETCHAR_P1 and PUTCHAR_P1
 ;;; defined in separated file
-;;;----------------------------------------------------------------------------
-
+;;;---------------------------------------------------------------------------
 ;;; supported baudrates are 4800bps or 9600bps
 ;; BAUDRATE equ 4800	; 4800 bps, 8 data bits, no parity, 1 stop bit
 BAUDRATE equ 9600   ; 9600 bps, 8 data bits, no parity, 1 stop bit
 
-        include "uart.inc"
+	switch BAUDRATE
+	case 4800
+	include "4800bps.inc"
+	case 9600
+	include "9600bps.inc"
+	endcase
+
+;;;---------------------------------------------------------------------------
+;;; PRINT_ACC
+;;; print contents of ACC('0'...'F') as a character
+;;; destroy: P1, P6, P7, ACC
+;;;---------------------------------------------------------------------------
+
+PRINT_ACC:
+	FIM R2R3, 30H		;'0'
+	CLC			; clear carry
+	DAA			; ACC=ACC+6 if ACC>9 and set carry
+	JCN CN, PRINTACC_L1
+	INC R2
+	IAC
+PRINTACC_L1:	
+	XCH R3			; R3<-ACC
+	JUN PUTCHAR_P1		; not JMS but JUN (Jump to PUTCHAR and return)
+
+;;;---------------------------------------------------------------------------
+;;; PRINT_CRLF
+;;; print "\r\n"
+;;; destroy: P1, ACC
+;;; this routine consumes 2 PC stack
+;;;---------------------------------------------------------------------------
+PRINT_CRLF:
+	FIM P1, '\r'
+	JMS PUTCHAR_P1
+	FIM P1, '\n'
+	JMS PUTCHAR_P1
+	BBL 0
+
+;;;---------------------------------------------------------------------------
+;;; PRINT_CR
+;;; print "\r"
+;;; destroy: P1, ACC
+;;; this routine consumes 1 PC stack
+;;;---------------------------------------------------------------------------
+PRINT_CR:
+	FIM P1, '\r'
+	JUN PUTCHAR_P1
+
+;;;---------------------------------------------------------------------------
+;;; PRINT_LF
+;;; print "\n"
+;;; destroy: P1, ACC
+;;; this routine consumes 1 PC stack
+;;;---------------------------------------------------------------------------
+PRINT_LF:
+	FIM P1, '\n'
+	JUN PUTCHAR_P1
+
+;;;---------------------------------------------------------------------------
+;;; INIT_SERIAL
+;;; Initialize serial port
+;;;---------------------------------------------------------------------------
+
+INIT_SERIAL:
+	if (BANK_SERIAL != BANK_DEFAULT)
+	LDM BANK_SERIAL     ; bank of output port
+        DCL                 ; set port bank
+	endif
+	
+        FIM P7, CHIP_SERIAL ; chip# of output port
+	SRC P7              ; set port address
+	LDM 1
+        WMP                 ; set serial port to 1 (TTL->H)
+
+	if (BANK_SERIAL != BANK_DEFAULT)
+	LDM BANK_DEFAULT    
+        DCL                 ; restore bank to default
+	endif
+
+        BBL 0
 
 ;;;---------------------------------------------------------------------------
 ;;; CTOI_P1_R5
@@ -1800,7 +2037,7 @@ STR_ADD:
 STR_CALC:
 	data "\n\rCalculator Mode\n\r", 0
 STR_CMDERR:
-	data "\n\rr:Read ram, w:Write ram, p:write Pm, d:Dump pm, l:cLear, c:Calc\n\r", 0 ;
+	data "\n\rd:dump RAM, w:write RAM, W:Write PM, D:Dump PM\n\rC:Clear, c:Calc mode\n\r", 0 ;
 STR_CALCERR:
 	data "**ERROR**\n",0
 
