@@ -258,6 +258,59 @@ PM_WRITE_READROUTINE:
 	BBL 0
 
 ;;;---------------------------------------------------------------------------
+;;; CMDC_SQUAREROOT:
+;;; X = sqrt(X)
+;;; registers Y, Z, T are destroyed
+;;; this routine cannot be a subroutine because of the limitation of stack
+;;;---------------------------------------------------------------------------
+CMDC_SQUAREROOT:
+	FIM P0, REG_T
+	JMS CLEAR_REGISTER_P0
+	LDM 14
+	XCH R1
+	SRC P0
+	LDM 5
+	WRM			; REG_T=0.5
+	
+	FIM P6, REG_A		; A = X
+	FIM P7, REG_X
+	JMS LD_REGISTER_P6_P7
+
+	FIM P3, loops(4, 16)
+; loop of "0.5 ENTER X ENTER A ENTER X / + *"
+; REG_T keeps 0.5 
+CMDC_SQR_LOOP:	
+	FIM P6, REG_Z		; Z = X
+	FIM P7, REG_X
+	JMS LD_REGISTER_P6_P7
+
+	FIM P6, REG_B		; B = X
+	JMS LD_REGISTER_P6_P7
+
+	FIM P6, REG_Y		; Y = A
+	FIM P7, REG_A
+	JMS LD_REGISTER_P6_P7
+
+	JMS CMDC_DIV
+	JMS CMDC_ADD
+	JMS CMDC_MUL
+
+	FIM P0, REG_X
+	JMS PRINT_REGISTER_P0
+	JMS PRINT_CR
+
+	FIM P6, REG_B
+	FIM P7, REG_X
+	JMS CMP_FRACTION_P6_P7
+	JCN Z, CMDC_SQR_EXIT
+	
+	ISZ R7, CMDC_SQR_LOOP
+	ISZ R6, CMDC_SQR_LOOP
+	
+CMDC_SQR_EXIT:
+	JUN CMDC_SQR_RETURN
+
+;;;---------------------------------------------------------------------------
 ;;; Monitor commands located in page 0100H
 ;;;---------------------------------------------------------------------------
 	org 0100H
@@ -517,14 +570,14 @@ COMMAND_G:
 ;;; Bank0, Chip 0
 ;;; Reg 0(D0-F, S0-3): REG_X
 ;;; Reg 1(D0-F, S0-3): REG_Y
-;;; Reg 2(D0-F, S0-3): REG_Z (not implemented yet)
-;;; Reg 3(D0-F, S0-3): REG_T (not implemented yet)
+;;; Reg 2(D0-F, S0-3): REG_Z
+;;; Reg 3(D0-F, S0-3): REG_T
 ;;;---------------------------------------------------------------------------
 ;;; Bank0, Chip 1
 ;;; Reg 0(D0-F, S0-3): REG_M (working for multiplication/division)
-;;; Reg 1(D0-F, S0-3): REG_A (working for square root) (not implemented yet)
-;;; Reg 2(D0-F, S0-3): REG_XI (working for square root) (not implemented yet)
-;;; Reg 3(D0-F, S0-3): REG_H (working for square root) (not implemented yet)
+;;; Reg 1(D0-F, S0-3): REG_A (working for square root)
+;;; Reg 2(D0-F, S0-3): REG_B
+;;; Reg 3(D0-F, S0-3): REG_C
 ;;;---------------------------------------------------------------------------
 ;;; Bank1, Chip 0
 ;;;---------------------------------------------------------------------------
@@ -540,8 +593,8 @@ REG_T	equ (CHIP_RAM0+(3<<4))	; CHIP#.11.0000
 
 REG_M	equ (CHIP_RAM1+(0<<4))	; CHIP#.00.0000
 REG_A	equ (CHIP_RAM1+(1<<4))	; CHIP#.01.0000
-REG_XI	equ (CHIP_RAM1+(2<<4))	; CHIP#.10.0000
-REG_H	equ (CHIP_RAM1+(3<<4))	; CHIP#.11.0000
+REG_B	equ (CHIP_RAM1+(2<<4))	; CHIP#.10.0000
+REG_C	equ (CHIP_RAM1+(3<<4))	; CHIP#.11.0000
 
 ;;;---------------------------------------------------------------------------
 ;;; Number expression (simple floating point)
@@ -595,6 +648,7 @@ CMDC_START:
 	XCH R7			; set digit counter = 0
 	FIM P0, REG_X
 	JMS PRINT_REGISTER_P0	; print REG_X
+	JMS PRINT_CRLF
 	
 CMDC_LOOP:		; loop for input digits to REG_X
 	JMS GETCHAR_P1
@@ -679,8 +733,11 @@ CMDC_L81:
 	FIM P0, 'r'		; square root
 	JMS CMP_P0P1
 	JCN ZN, CMDC_L9
-	JMS PRINT_CRLF
-	JMS CMDC_SQUAREROOT
+	FIM P0, lo(STR_CALC_SQRT)
+	JMS PRINT_P0
+	JUN CMDC_SQUAREROOT	; because of the limit of the stack,
+				; it cannot be a subroutine
+CMDC_SQR_RETURN:	
 	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
 	JUN CMDC_START
 CMDC_L9:
@@ -692,13 +749,18 @@ CMDC_L9:
 	FIM P0, '.'		; '.' digit point
 	JMS CMP_P0P1
 	JCN ZN, CMDC_L10
+	LD R6
+	RAL
+	JCN C, CMDC_L11	; skip if digit point flag (R6.bit3) is already set
+	JMS PUTCHAR_P1		; echo input
 	JMS CMDC_AUTOMATIC_PUSH_AND_CLEAR
 	JMS CMDC_DIGITPOINT
 	JUN CMDC_LOOP
 	
 CMDC_L10:
 	JMS ISNUM_P1
-	JCN Z, CMDC_L11          ; skip if not a number
+	JCN Z, CMDC_L11         ; skip if not a number
+	JMS PUTCHAR_P1		; echo input
 	JMS CMDC_AUTOMATIC_PUSH_AND_CLEAR
 	JMS CMDC_NUM
 CMDC_L11:
@@ -772,15 +834,12 @@ CMDC_PUSH_EXIT
 CMDC_DIGITPOINT:
 	LD R6
 	RAL
-	JCN C, CMDC_DP_EXIT	; skip if digit point flag (R6.bit3)
-				; is already set
-	STC			; else set digit point flag R6.bit3
+	STC			; set digit point flag R6.bit3
 	RAR
 	XCH R6                  
-
-	JMS PUTCHAR_P1		; put '.'
 CMDC_DP_EXIT:	
 	BBL 0
+
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_CLEAR
 ;;; clear all registers
@@ -863,7 +922,6 @@ CMDC_SETNUM:
 	RAL
 	XCH R6
 CMDC_NUM_EXIT:
-	JMS PUTCHAR_P1		; echo input
 	BBL 0
 
 ;;;---------------------------------------------------------------------------
@@ -911,7 +969,7 @@ CMDC_ADD_SAMESIGN:
 	JMS ADD_FRACTION_P6_P7
 	
 CMDC_ADD_EXIT:
-	JUN CMDC_NORMALIZE_AND_EXIT
+	JUN CMDC_NORMALIZE_AND_POP
 
 CMDC_ADD_ZERO_EXIT:
 	FIM P0, REG_X
@@ -919,13 +977,13 @@ CMDC_ADD_ZERO_EXIT:
 	JUN CMDC_ADD_EXIT
 
 ;;;---------------------------------------------------------------------------
-;;; CMDC_NORMALIZE_AND_EXIT
+;;; CMDC_NORMALIZE_AND_POP
 ;;; Common routine for finish calculation
 ;;; Normalize REG_X
 ;;; Pop registers
 ;;; REG_Y<= REG_Z<=REG_T
 ;;;---------------------------------------------------------------------------
-CMDC_NORMALIZE_AND_EXIT:
+CMDC_NORMALIZE_AND_POP:
  	FIM P0, REG_X
  	JMS NORMALIZE_REGISTER_P0
 
@@ -1103,7 +1161,6 @@ NM_EXIT:
 ;;; CMDC_MUL
 ;;; X = X * Y
 ;;;---------------------------------------------------------------------------
-	
 CMDC_MUL:
 	FIM P0, REG_X
 	JMS ISZERO_REGISTER_P0
@@ -1142,7 +1199,7 @@ CMDC_MUL_L0:
 	JMS MUL_FRACTION_XY
 
 CMDC_MUL_EXIT:
-	JUN CMDC_NORMALIZE_AND_EXIT
+	JUN CMDC_NORMALIZE_AND_POP
 CMDC_MUL_ZERO:
 	FIM P0, REG_X
 	JMS CLEAR_REGISTER_P0
@@ -1211,32 +1268,22 @@ MUL_LOOP_NEXT:
 	BBL 0
 	
 ;;;---------------------------------------------------------------------------
-;;; CMDC_SQUAREROOT:
-;;;---------------------------------------------------------------------------
-CMDC_SQUAREROOT:
-	;;  to be implemented
-	FIM P0, REG_X
-	JMS CLEAR_REGISTER_P0
-	LDM 14
-	XCH R1
-	SRC P0
-	LDM 5
-	WRM
-	BBL 0
-
-;;;---------------------------------------------------------------------------
 ;;; CMDC_PRINT
 ;;; Print X and Y
 ;;;---------------------------------------------------------------------------
 CMDC_PRINT:
 	FIM P0, REG_X
 	JMS PRINT_REGISTER_WITH_NAME_P0
+	JMS PRINT_CRLF
 	FIM P0, REG_Y
 	JMS PRINT_REGISTER_WITH_NAME_P0
+	JMS PRINT_CRLF
 	FIM P0, REG_Z
 	JMS PRINT_REGISTER_WITH_NAME_P0
+	JMS PRINT_CRLF
 	FIM P0, REG_T
 	JMS PRINT_REGISTER_WITH_NAME_P0
+	JMS PRINT_CRLF
 	BBL 0
 
 ;;;---------------------------------------------------------------------------
@@ -1537,7 +1584,7 @@ DIV_FRAC:
 	;; 	JUN DIV_FRACTION_XY
 	;; RETURN_DIV_FRACTION_XY:	
 	; normalize REG_X and clear REG_Y
-	JUN CMDC_NORMALIZE_AND_EXIT
+	JUN CMDC_NORMALIZE_AND_POP
 	
 CMDC_DIV_BY_ZERO:
 	FIM P0, REG_X
@@ -1722,8 +1769,6 @@ PRINT_REGISTER_LOOP:
 PRINT_REGISTER_L1:
 	ISZ R11, PRINT_REGISTER_LOOP
 PRINT_EXIT:	
-	JMS PRINT_CR		; not use PRINT_CRLF
-	JMS PRINT_LF		; to avoid consuming the stack 
 	BBL 0
 
 ;;;----------------------------------------------------------------------------
@@ -2025,7 +2070,7 @@ P7_EXIT:
 ;;;----------------------------------------------------------------------------
 
 STR_OMSG:
-	data "\rIntel MCS-4 (4004)\n\rTiny Monitor\n\r", 0
+	data "\rIntel MCS-4 (4004)\r\nTiny Monitor\r\n", 0
 STR_VFD_INIT:		;reset VFD and set scroll mode
 	data 1bH, 40H, 1fH, 02H, 0
 STR_BANK:
@@ -2035,11 +2080,11 @@ STR_CHIP:
 STR_ADD:
 	data " ADD(Fx0)=", 0
 STR_CALC:
-	data "\n\rCalculator Mode\n\r", 0
+	data "\r\nCalculator Mode\r\n", 0
 STR_CMDERR:
-	data "\n\rd:dump RAM, w:write RAM, W:Write PM, D:Dump PM\n\rC:Clear, c:Calc mode\n\r", 0 ;
-STR_CALCERR:
-	data "**ERROR**\n",0
+	data "\r\nd:dump RAM, w:write RAM, W:Write PM, D:Dump PM\r\nC:Clear, c:Calc mode\r\n", 0 ;
+STR_CALC_SQRT:
+	data " SQR\r\n",0
 
 ;;;----------------------------------------------------------------------------
 ;;; String data
