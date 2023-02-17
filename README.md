@@ -8,14 +8,13 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 ![](images/breadboard.jpg)
 
 ## 概要
-2022年末に運良くIntel 4004を入手することができました．せっかくだから動かしてみようと思い，このプロジェクトを始めました．
-現在進行中の未完成プロジェクトです．
+昨年，運良くIntel 4004を入手することができました．せっかくだから動かしてみようと思い，このプロジェクトを始めました．現在進行中の未完成プロジェクトです．
 
-## 作ったもの
+## これまでに作ったもの
 - 4004実験用ボード
-- シリアル通信用インターフェース
-- 簡易モニター
-- 電卓
+  - シリアル通信用インターフェース
+  - 簡易モニター
+  - 電卓
 
 ## ToDO
 - VTL的な言語
@@ -23,6 +22,10 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 - プログラムメモリのRAM領域の拡大
   - 現在の実装では256byteに制限されている
 - プリント基板作成
+
+## 動画
+Youtubeで関連動画を公開しています．
+- https://www.youtube.com/@ryomukai/videos
 
 ## ブログ
 関連する情報が書いてあるかも．
