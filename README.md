@@ -21,6 +21,7 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
   - マンデルブロ集合を表示するぐらいのプログラムを実行させたい
 - プログラムメモリのRAM領域の拡大
   - 現在の実装では256byteに制限されている
+→ バンク切り替えで256byte x 8面使えるようにした．(2023/2/20)
 - プリント基板作成
 
 ## 動画
@@ -48,3 +49,10 @@ Youtubeで関連動画を公開しています．
 ### 開発環境
 - [The Macroassembler AS](http://john.ccac.rwth-aachen.de:8000/as/)
 - [Intel 4004 emulator assembler disassembler](http://e4004.szyc.org/)
+
+
+## 更新履歴
+- 2023/2/20: ハードウェアをrev.0.2に更新
+  - プログラム領域のメモリ(6116)のA8〜A10を4002のポートに接続してバンク切り替えで256byte(正確には254byte) x 8 バンク使えるようにしました．
+  - モニターの'B'命令で切り替えます．
+  -  バンク窓以外の空間をROM領域に使うように改修する余地ができたので，将来必要になれば改修したい．

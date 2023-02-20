@@ -1,7 +1,7 @@
 ;;;---------------------------------------------------------------------------
 ;;; Tiny Monitor with calculator program for Intel 4004 evaluation board
 ;;; by Ryo Mukai
-;;; 2023/02/17
+;;; 2023/02/20
 ;;;---------------------------------------------------------------------------
 
 ;;;---------------------------------------------------------------------------
@@ -81,6 +81,10 @@ CHIP_SERIAL     equ CHIP_RAM0
 PM_TOP          equ 0F00H
 PM_READ_P0_P2   equ 0FFEH
 
+;;; Port for PM Bank Selection(BANK# and CHIP#)
+BANK_PMSELECT     equ BANK_RAM1
+CHIP_PMSELECT     equ CHIP_RAM1
+
 ;;; Default Bank
 BANK_DEFAULT	equ BANK_RAM0
 		
@@ -101,6 +105,9 @@ MAIN:
 	endif
 	
 	JMS INIT_SERIAL ; Initialize Serial Port
+
+	CLB
+	JMS PM_SELECTBANK_ACC	 ; set bank of program memory 0
 	JMS PM_WRITE_READROUTINE ; write PM_READ code on program memory
 
 ;       JCN TN, $		wait for TEST="0" (button pressed)
@@ -117,7 +124,6 @@ CMD_LOOP:
 
 L_CR:
 	JMS GETCHAR_P1
-        JMS DISPLED_ACC
         JMS DISPLED_P1
 	FIM P0, '\r'
 	JMS CMP_P0P1
@@ -157,8 +163,13 @@ L3:
 L4:
 	FIM P0, 'C'		; Clear program memory
 	JMS CMP_P0P1
+	JCN ZN, L41
+	JUN COMMAND_CP
+L41:
+	FIM P0, 'B'		; Set Bank of program memory
+	JMS CMP_P0P1
 	JCN ZN, L5
-	JUN COMMAND_CL
+	JUN COMMAND_BP
 L5:
 	FIM P0, 'g'		; Go to PM_TOP (0F00H)
 	JMS CMP_P0P1
@@ -257,6 +268,29 @@ PM_WRITE_READROUTINE:
 	JMS PM_WRITE_P0_P1
 	BBL 0
 
+;;;---------------------------------------------------------------------------
+;;; PM_SELECTBANK_ACC
+;;; Write ACC to RAM port (BANK_PMSELECT, CHIP_PMSELECT)
+;;; to select a bank of program memory
+;;; destroy: P7
+;;;---------------------------------------------------------------------------
+PM_SELECTBANK_ACC:
+	if (BANK_PMSELECT != BANK_DEFAULT)
+	XCH R15
+	LDM BANK_PMSELECT
+	DCL
+	XCH R15
+	endif 
+	
+        FIM P7, CHIP_PMSELECT
+        SRC P7
+        WMP
+	
+	if (BANK_PMSELECT != BANK_DEFAULT)
+	LDM BANK_DEFAULT
+	DCL
+	endif
+	BBL 0
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_SQUAREROOT:
 ;;; X = sqrt(X)
@@ -536,10 +570,10 @@ CMDDP_L1:
 	JUN CMD_LOOP		; return to command loop
 
 ;;;---------------------------------------------------------------------------
-;;; COMMAND_CL
+;;; COMMAND_CP
 ;;; Clear Program Memory
 ;;;---------------------------------------------------------------------------
-COMMAND_CL:
+COMMAND_CP:
 	JMS PRINT_CRLF
 
 	FIM P0, 00H
@@ -551,6 +585,23 @@ CMDCL_L1:
 	
 	JUN CMD_LOOP		; return to command loop
 
+;;;---------------------------------------------------------------------------
+;;; COMMAND_BP
+;;; Set a bank of program memory
+;;;---------------------------------------------------------------------------
+COMMAND_BP:
+	FIM P0, lo(STR_BANK)	; print " BANK="
+	JMS PRINT_P0
+	JMS GETCHAR_P1
+	JMS PUTCHAR_P1
+	JMS CTOI_P1_R5
+	LD R5
+	JMS PM_SELECTBANK_ACC
+	JMS PM_WRITE_READROUTINE
+	JMS PRINT_CRLF
+
+	JUN CMD_LOOP		; return to command loop
+	
 ;;;---------------------------------------------------------------------------
 ;;; COMMAND_G
 ;;; Go to Top of Program memory PM_TOP(0x0F00)
@@ -652,7 +703,6 @@ CMDC_START:
 	
 CMDC_LOOP:		; loop for input digits to REG_X
 	JMS GETCHAR_P1
-        JMS DISPLED_ACC
         JMS DISPLED_P1
 	FIM P0, '\r'
 	JMS CMP_P0P1
@@ -1913,35 +1963,6 @@ DISPLED_P1:
 	
         BBL 0
 
-;;;----------------------------------------------------------------------------
-;;; DISPLED_ACC
-;;;   DISPLAY the contents of ACC on Port 1
-;;; Input: ACC
-;;; Output:  ACC=0
-;;; Working: P7
-;;; Destroy: P7
-;;;----------------------------------------------------------------------------
-
-DISPLED_ACC:
-	if (BANK_RAM1 != BANK_DEFAULT)
-        LDM BANK_RAM1
-        DCL
-	endif
-	
-        FIM P7, CHIP_RAM1
-        XCH R14         ; save ACC
-
-        XCH R14         ; restore ACC
-        SRC P7          
-        WMP
-
-	if (BANK_RAM1 != BANK_DEFAULT)
-	LDM BANK_DEFAULT	; restore BANK to default
-	DCL
-	endif
-	
-	BBL 0
-                
 ;;;----------------------------------------------------------------------------
 ;;; BLINK_LED
 ;;;   Blink LED N times (N=ACC, N=16 if ACC==0)
