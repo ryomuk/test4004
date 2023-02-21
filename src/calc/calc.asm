@@ -79,7 +79,7 @@ CHIP_SERIAL     equ CHIP_RAM0
 
 ;;; Program Memory
 PM_TOP          equ 0F00H
-PM_READ_P0_P2   equ 0FFEH
+PM_READ_P0_P1   equ 0FFEH
 
 ;;; Port for PM Bank Selection(BANK# and CHIP#)
 BANK_PMSELECT     equ BANK_RAM1
@@ -260,8 +260,8 @@ PM_WRITE_P0_P1:
 ;;; preparation for reading program memory
 ;;;---------------------------------------------------------------------------
 PM_WRITE_READROUTINE:	
-	FIM P0, lo(PM_READ_P0_P2)
-	FIM P1, 34H		; FIN P2
+	FIM P0, lo(PM_READ_P0_P1)
+	FIM P1, 32H		; FIN P1
 	JMS PM_WRITE_P0_P1
 	INC R1
 	FIM P1, 0C0H		; BBL 0
@@ -557,10 +557,10 @@ CMDDP_L1:
 	FIM P1, ' '
 	JMS PUTCHAR_P1
 
-	JMS PM_READ_P0_P2	; Read program memory
-	LD R4
+	JMS PM_READ_P0_P1	; Read program memory
+	LD R2
 	JMS PRINT_ACC
-	LD R5
+	LD R3
 	JMS PRINT_ACC
 
 	ISZ R1, CMDDP_L1
@@ -2120,8 +2120,8 @@ STR_CALC_SQRT:
 ;;; output: P1
 ;;;---------------------------------------------------------------------------
 ;;; 	org 0FF0H
-;;; PM_READ_P0_P2:
-	FIN P2
+;;; PM_READ_P0_P1:
+	FIN P1
 	BBL 0
 
 	end
