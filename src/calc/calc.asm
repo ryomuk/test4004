@@ -1,7 +1,7 @@
 ;;;---------------------------------------------------------------------------
 ;;; Tiny Monitor with calculator program for Intel 4004 evaluation board
 ;;; by Ryo Mukai
-;;; 2023/02/20
+;;; 2023/02/23
 ;;;---------------------------------------------------------------------------
 
 ;;;---------------------------------------------------------------------------
@@ -194,21 +194,22 @@ SETBANKCHIP_P5:
 	JMS PRINT_P0
 	JMS GETCHAR_P1
 	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	LD R5
+	JMS CTOI_P1
+	LD R3
 	XCH R10			; save BANK to R10
 
 	FIM P0, lo(STR_CHIP)	; print " CHIP="
 	JMS PRINT_P0
 	JMS GETCHAR_P1
 	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	JMS PRINT_CRLF
-	CLB
-	LD R5		; R5 is #chip(0.0.D3.D2)
+	JMS CTOI_P1
+	LD R3
+	CLC
 	RAL
+	CLC
 	RAL
 	XCH R11 	;set D3D2.00@X2 to R11 (0000 or 0100 or 1000 or 1100)
+	JMS PRINT_CRLF
 	BBL 0
 	
 ;;;---------------------------------------------------------------------------
@@ -433,10 +434,10 @@ CMDW_L2:
 	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
 
 	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
 
 	SRC R6R7	; set address
-	LD R5
+	LD R3
 	WRM			; write to memory
 	JMS PRINT_ACC
 	ISZ R7,CMDW_L2
@@ -446,34 +447,34 @@ CMDW_L2:
 	JMS PUTCHAR_P1
 
 	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
 
 	SRC R6R7	; set address
-	LD R5
+	LD R3
 	WR0
 	JMS PRINT_ACC
 
 	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
 
 	SRC R6R7	; set address
-	LD R5
+	LD R3
 	WR1
 	JMS PRINT_ACC
 
 	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
 
 	SRC R6R7	; set address
-	LD R5
+	LD R3
 	WR2
 	JMS PRINT_ACC
 
 	JMS GETCHAR_P1
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
 
 	SRC R6R7	; set address
-	LD R5
+	LD R3
 	WR3
 	JMS PRINT_ACC
 	JMS PRINT_CRLF
@@ -491,7 +492,9 @@ COMMAND_WP:
 	JMS PRINT_P0
 	JMS GETCHAR_P1
 	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
+	LD R3
+	XCH R5
 	JMS PRINT_CRLF
 
 	FIM P1,'F'
@@ -514,15 +517,13 @@ CMDWP_L1:
 
 	JMS GETCHAR_P1
 	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	LD R5
+	JMS CTOI_P1
+	LD R3
 	XCH R4
 
 	JMS GETCHAR_P1
 	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	LD R5
-	XCH R3
+	JMS CTOI_P1
 
 	LD R4
 	XCH R2
@@ -558,9 +559,11 @@ CMDDP_L1:
 	JMS PUTCHAR_P1
 
 	JMS PM_READ_P0_P1	; Read program memory
+	LD R3
+	XCH R5
 	LD R2
 	JMS PRINT_ACC
-	LD R3
+	LD R5
 	JMS PRINT_ACC
 
 	ISZ R1, CMDDP_L1
@@ -594,8 +597,8 @@ COMMAND_BP:
 	JMS PRINT_P0
 	JMS GETCHAR_P1
 	JMS PUTCHAR_P1
-	JMS CTOI_P1_R5
-	LD R5
+	JMS CTOI_P1
+	LD R3
 	JMS PM_SELECTBANK_ACC
 	JMS PM_WRITE_READROUTINE
 	JMS PRINT_CRLF
@@ -671,7 +674,7 @@ REG_ERROR_DIVBYZERO equ 2
 ;;; 	Calculator
 ;;; P0(R0, R1): working for PRINT
 ;;; P1(R2, R3): working for PRINT, GETCHAR, PUTCHAR
-;;; P2(R4, R5): working for CTOI
+;;; P2(R4, R5):
 ;;; P3(R6, R7):   
 ;;; 		  R6.bit0 = automatic ENTER flag (0:desable , 1:enable)
 ;;;               R6.bit1 = input full flag (0:not full, 1:full)
@@ -931,11 +934,12 @@ CMDC_ENTER:
 ;;;        R7=digit count
 ;;;---------------------------------------------------------------------------
 CMDC_NUM:
-	JMS CTOI_P1_R5
+	JMS CTOI_P1
+	LD R3
 	;; 	LD R6			; check digit point flag (R6.bit3)
 	;; 	RAL
 	;; 	JCN C,CMDC_NUM_L1	; digit point flag is ture
-	;; 	LD R5			; when digit point frag is false,
+	;; 	LD R3			; when digit point frag is false,
 	;; 	JCN NZ, CMDC_NUM_L1	; ignore key in '0' if digit counter is 1
 	;; 	LD R7		
 	;; 	DAC
@@ -956,7 +960,7 @@ CMDC_NUM:
 	LD R7
 	WR0
 CMDC_SETNUM:
-	LD R5
+	LD R3
 	WRM
 	INC R7
 	LDM 15			; maximum number of digits is 14,
@@ -1915,12 +1919,12 @@ INIT_SERIAL:
         BBL 0
 
 ;;;---------------------------------------------------------------------------
-;;; CTOI_P1_R5
+;;; CTOI_P1
 ;;; convert character ('0'...'f') to value 0000 ... 1111
 ;;; input: P1(R2R3)
-;;; output: R5
+;;; output: R3, (R2=0)
 ;;;---------------------------------------------------------------------------
-CTOI_P1_R5:
+CTOI_P1:
 	CLB
 	LDM 3
 	SUB R2
@@ -1928,10 +1932,10 @@ CTOI_P1_R5:
 	CLB
 	LDM 9
 	ADD R3
-	XCH R3
+	XCH R3			; R3 = R3 + 9 for 'a-fA-F'
 CTOI_09:
-	LD R3
-	XCH R5
+	CLB
+	XCH R2			; R2 = 0
 	BBL 0
 	
 ;;;----------------------------------------------------------------------------
