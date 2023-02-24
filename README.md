@@ -17,7 +17,8 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
   - 電卓
 
 ## 実験用ボードの仕様
-- CPU: 4004
+- CPU: Intel 4004
+- Clock: 740kHz
 - DATA RAM: 4002-1(320bit) x 4
 - Program Memory
   - ROM: AT28C64B (8k x 8bit EEPROM)
