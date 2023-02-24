@@ -97,10 +97,8 @@ GETCHAR_OK:
 ;;;---------------------------------------------------------------------------
 
 PUTCHAR_P1:
-	if (BANK_SERIAL != BANK_DEFAULT)
 	LDM BANK_SERIAL     ; bank of output port
         DCL                 ; set port bank
-	endif
 
         FIM P7, CHIP_SERIAL ; chip# of output port
 	SRC P7              ; set port address
@@ -132,9 +130,7 @@ PUTCHAR_L2:
         RAR                 ;(1)
         ISZ R13, PUTCHAR_L2  ;(2)
 	
-	if (BANK_SERIAL != BANK_DEFAULT)
 	LDM BANK_DEFAULT    
         DCL                 ; restore bank to default
-	endif
         BBL 0
 

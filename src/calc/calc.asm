@@ -74,16 +74,16 @@ CHIP_RAM2      	equ 00H
 CHIP_RAM3      	equ 40H
 
 ;;; Serial Port (BANK# and CHIP#)
-BANK_SERIAL     equ BANK_RAM0
-CHIP_SERIAL     equ CHIP_RAM0
+BANK_SERIAL     equ BANK_RAM3
+CHIP_SERIAL     equ CHIP_RAM3
 
 ;;; Program Memory
 PM_TOP          equ 0F00H
 PM_READ_P0_P1   equ 0FFEH
 
 ;;; Port for PM Bank Selection(BANK# and CHIP#)
-BANK_PMSELECT     equ BANK_RAM1
-CHIP_PMSELECT     equ CHIP_RAM1
+BANK_PMSELECT     equ BANK_RAM0
+CHIP_PMSELECT     equ CHIP_RAM0
 
 ;;; Default Bank
 BANK_DEFAULT	equ BANK_RAM0
@@ -95,15 +95,6 @@ BANK_DEFAULT	equ BANK_RAM0
 
 MAIN:
         CLB
-
-	if (BANK_DEFAULT != 0)
-	;; initialize DL to bank 0
-	;; DL is assumed to be set back to BANK_DEFAULT (normally 0)
-	;; except when in use for another banks.
-	LDM BANK_DEFAULT
-	DCL
-	endif
-	
 	JMS INIT_SERIAL ; Initialize Serial Port
 
 	CLB
@@ -276,21 +267,16 @@ PM_WRITE_READROUTINE:
 ;;; destroy: P7
 ;;;---------------------------------------------------------------------------
 PM_SELECTBANK_ACC:
-	if (BANK_PMSELECT != BANK_DEFAULT)
-	XCH R15
-	LDM BANK_PMSELECT
-	DCL
-	XCH R15
-	endif 
+	;; XCH R15
+	;; LDM BANK_PMSELECT
+	;; DCL
+	;; XCH R15
 	
         FIM P7, CHIP_PMSELECT
         SRC P7
         WMP
-	
-	if (BANK_PMSELECT != BANK_DEFAULT)
-	LDM BANK_DEFAULT
-	DCL
-	endif
+	;; LDM BANK_DEFAULT
+	;; DCL
 	BBL 0
 ;;;---------------------------------------------------------------------------
 ;;; CMDC_SQUAREROOT:
@@ -1901,20 +1887,16 @@ PRINT_LF:
 ;;;---------------------------------------------------------------------------
 
 INIT_SERIAL:
-	if (BANK_SERIAL != BANK_DEFAULT)
 	LDM BANK_SERIAL     ; bank of output port
         DCL                 ; set port bank
-	endif
 	
         FIM P7, CHIP_SERIAL ; chip# of output port
 	SRC P7              ; set port address
 	LDM 1
         WMP                 ; set serial port to 1 (TTL->H)
 
-	if (BANK_SERIAL != BANK_DEFAULT)
 	LDM BANK_DEFAULT    
         DCL                 ; restore bank to default
-	endif
 
         BBL 0
 
@@ -1940,7 +1922,7 @@ CTOI_09:
 	
 ;;;----------------------------------------------------------------------------
 ;;; DISPLED_P1
-;;;   DISPLAY the contents of P1 on Port 2 and 3
+;;;   DISPLAY the contents of P1 on Port 1 and 2
 ;;; Input: P1(R2R3)
 ;;; Output:  ACC=0
 ;;; Working: P7
@@ -1948,16 +1930,16 @@ CTOI_09:
 ;;;----------------------------------------------------------------------------
 
 DISPLED_P1:
-	LDM BANK_RAM2
+	LDM BANK_RAM1
         DCL
-        FIM P7, CHIP_RAM2
+        FIM P7, CHIP_RAM1
         SRC P7
         LD R3
         WMP
 	
-        LDM BANK_RAM3
+        LDM BANK_RAM2
         DCL
-        FIM P7, CHIP_RAM3
+        FIM P7, CHIP_RAM2
         SRC P7
         LD R2
         WMP
@@ -2012,20 +1994,16 @@ BLINK_SUB:
         BBL 0
 
 ;;;----------------------------------------------------------------------------
-;;; Wait Subroutines WAIT10MS and WAIT100MS
-;;;
-;;; Constants '45EF'(10ms) and '11FE'(100ms) are calculated
-;;; by Jim's 4004 Delay Loop Calculator
-;;; https://github.com/jim11662418/4004-delay-calculator
-;;;
-;;; 10.8003857uS/cycle (@5.185MHz clock)
-;;;----------------------------------------------------------------------------
-;;;----------------------------------------------------------------------------
 ;;; WAIT10MS
 ;;; Input: ACC
 ;;; Output: return with ACC=0
 ;;; Destroy: P6, P7, (R12, R13, R14, R15)
 ;;;   wait for 10 * N ms (N=ACC, N=16 if ACC==0)
+;;; 
+;;; Constants '45EF'(10ms) is calculated by Jim's 4004 Delay Loop Calculator
+;;; https://github.com/jim11662418/4004-delay-calculator
+;;;
+;;; 10.8003857uS/cycle (@5.185MHz clock)
 ;;;----------------------------------------------------------------------------
                 
 WAIT10MS:
@@ -2041,27 +2019,6 @@ W10_L1:
 W10_EXIT:
 	BBL 0
 
-;;;----------------------------------------------------------------------------
-;;; WAIT100MS
-;;; Input: ACC
-;;; Output: return with ACC=0
-;;; Destroy: P6, P7, (R12, R13, R14, R15)
-;;;   wait for 100 * N ms (N=ACC, N=16 if ACC==0)
-;;;----------------------------------------------------------------------------
-                
-WAIT100MS:
-	FIM R12R13, 011H  ; 99958us delay(9255 cycles)
-        FIM R14R15, 0FEH  ; 
-W100_L1:
-        ISZ R12, W100_L1
-        ISZ R13, W100_L1
-        ISZ R14, W100_L1
-        ISZ R15, W100_L1
-        DAC
-        JCN ZN, WAIT100MS  ; 99990us delay(9258 cycles)/loop
-W100_EXIT:
-	BBL 0
-                
 ;;;----------------------------------------------------------------------------
 ;;; Print subroutine and string data located in Page 7 (0700H-07FFH)
 ;;; 
