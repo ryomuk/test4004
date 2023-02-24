@@ -1,4 +1,4 @@
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 1 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 1 - 2023/02/24 22:59:16
 
 
        1/       0 :                     ;;;---------------------------------------------------------------------------
@@ -61,7 +61,7 @@
       58/       0 : =R7P                 R14R15  reg RERF
       59/       0 :                     
       60/       0 :                     ;;;---------------------------------------------------------------------------
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 2 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 2 - 2023/02/24 22:59:16
 
 
       61/       0 :                     ;;; Hardware Configuration
@@ -124,7 +124,7 @@
      118/      19 : 56 7E                       JMS DISPLED_P1
      119/      1B : 20 0D               	FIM P0, '\r'
      120/      1D : 50 98               	JMS CMP_P0P1
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 3 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 3 - 2023/02/24 22:59:16
 
 
      121/      1F : 14 17               	JCN Z, L_CR		; skip CR
@@ -187,7 +187,7 @@
      178/      79 :                     
      179/      79 :                     ;;;---------------------------------------------------------------------------
      180/      79 :                     ;;; SETBANKCHIP_P5
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 4 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 4 - 2023/02/24 22:59:16
 
 
      181/      79 :                     ;;; Set #bank and #chip to R10 and R11
@@ -250,7 +250,7 @@
      238/      AA :                     ;;; input: P0, P1
      239/      AA :                     ;;; output: none
      240/      AA :                     ;;;---------------------------------------------------------------------------
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 5 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 5 - 2023/02/24 22:59:16
 
 
      241/      AA :                     	
@@ -313,7 +313,7 @@
      298/      CE : 54 D4               	JMS LD_REGISTER_P6_P7
      299/      D0 :                     
      300/      D0 : 26 C0               	FIM P3, loops(4, 16)
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 6 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 6 - 2023/02/24 22:59:16
 
 
      301/      D2 :                     ; loop of "0.5 ENTER X ENTER A ENTER X / + *"
@@ -376,7 +376,7 @@
      358/     100 : DC                  	LDM loop(4)		; 4 regs
      359/     101 : B4                  	XCH R4			; R4=loop(4)
      360/     102 :                     
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 7 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 7 - 2023/02/24 22:59:16
 
 
      361/     102 :                     	;; PRINT 16 characters
@@ -439,7 +439,7 @@
      418/     131 : F1                  	CLC
      419/     132 : 8B                  	ADD R11
      420/     133 : B6                  	XCH R6		;R6=D3D2D1D0@X2 (#chip.#reg)
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 8 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 8 - 2023/02/24 22:59:16
 
 
      421/     134 :                     
@@ -502,7 +502,7 @@
      478/     16F : 57 00               	JMS PRINT_P0
      479/     171 : 56 00               	JMS GETCHAR_P1
      480/     173 : 56 28               	JMS PUTCHAR_P1
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 9 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 9 - 2023/02/24 22:59:16
 
 
      481/     175 : 56 72               	JMS CTOI_P1
@@ -565,7 +565,7 @@
      538/     1B5 : 56 4C               	JMS PRINT_ACC
      539/     1B7 : 22 30               	FIM P1,'0'
      540/     1B9 : 56 28               	JMS PUTCHAR_P1
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 10 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 10 - 2023/02/24 22:59:16
 
 
      541/     1BB : 22 3A               	FIM P1,':'
@@ -628,7 +628,7 @@
      598/     1F6 :                     COMMAND_G:
      599/     1F6 : 56 57               	JMS PRINT_CRLF
      600/     1F8 : 5F 00               	JMS PM_TOP
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 11 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 11 - 2023/02/24 22:59:16
 
 
      601/     1FA : 40 13               	JUN CMD_LOOP		; return to command loop
@@ -691,7 +691,7 @@
      658/     200 :                     ;;;---------------------------------------------------------------------------
      659/     200 :                     ;;;COMMAND_C
      660/     200 :                     ;;; 	Calculator
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 12 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 12 - 2023/02/24 22:59:16
 
 
      661/     200 :                     ;;; P0(R0, R1): working for PRINT
@@ -754,7 +754,7 @@
      718/     23D : 53 41               	JMS CMDC_ADD
      719/     23F : 52 DA               	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
      720/     241 : 42 06               	JUN CMDC_START
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 13 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 13 - 2023/02/24 22:59:16
 
 
      721/     243 :                     CMDC_L3:
@@ -817,7 +817,7 @@
      778/     2A5 :                     				; it cannot be a subroutine
      779/     2A5 :                     CMDC_SQR_RETURN:	
      780/     2A5 : 52 DA               	JMS CMDC_SET_AUTOMATIC_ENTER_FLAG
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 14 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 14 - 2023/02/24 22:59:16
 
 
      781/     2A7 : 42 06               	JUN CMDC_START
@@ -880,7 +880,7 @@
      838/     2E0 :                     ;;;---------------------------------------------------------------------------
      839/     2E0 :                     ;;; CMDC_CLEAR_AUTOMATIC_ENTER_FLAG
      840/     2E0 :                     ;;; clear automatic ENTER flag
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 15 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 15 - 2023/02/24 22:59:16
 
 
      841/     2E0 :                     ;;;---------------------------------------------------------------------------
@@ -943,7 +943,7 @@
      898/     30D :                     ;;;---------------------------------------------------------------------------
      899/     30D :                     ;;; CMDC_ENTER
      900/     30D :                     ;;; Push register stack
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 16 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 16 - 2023/02/24 22:59:16
 
 
      901/     30D :                     ;;; 	X=>Y=>Z=>T
@@ -1006,7 +1006,7 @@
      958/     33A : F6                  	RAR
      959/     33B : F6                  	RAR
      960/     33C : FA                  	STC
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 17 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 17 - 2023/02/24 22:59:16
 
 
      961/     33D : F5                  	RAL
@@ -1069,7 +1069,7 @@
     1018/     37E :                     
     1019/     37E :                     ;;;---------------------------------------------------------------------------
     1020/     37E :                     ;;; CMDC_NORMALIZE_AND_POP
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 18 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 18 - 2023/02/24 22:59:16
 
 
     1021/     37E :                     ;;; Common routine for finish calculation
@@ -1132,7 +1132,7 @@
     1078/     39E :                     SUB_FRACTION_P6_P7:
     1079/     39E : F0                  	CLB
     1080/     39F : BD                  	XCH R13
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 19 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 19 - 2023/02/24 22:59:16
 
 
     1081/     3A0 : F0                  	CLB
@@ -1195,7 +1195,7 @@
     1138/     3C8 :                     
     1139/     3C8 :                     CMP_FRACTION_EXIT10:
     1140/     3C8 : C1                  	BBL 1			; REG(P6) < REG(P7)
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 20 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 20 - 2023/02/24 22:59:16
 
 
     1141/     3C9 :                     
@@ -1258,7 +1258,7 @@
     1198/     3F3 :                     
     1199/     400 :                     	org 0400H
     1200/     400 :                     ;;;---------------------------------------------------------------------------
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 21 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 21 - 2023/02/24 22:59:16
 
 
     1201/     400 :                     ;;; CMDC_MUL
@@ -1321,7 +1321,7 @@
     1258/     42A :                     ;;;  0EDCBA987654321 * E
     1259/     42A :                     ;;;   0EDCBA98765432 * D
     1260/     42A :                     ;;;    0EDCBA9876543 * C
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 22 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 22 - 2023/02/24 22:59:16
 
 
     1261/     42A :                     ;;;     0EDCBA987654 * B
@@ -1384,7 +1384,7 @@
     1318/     45A : 20 10               	FIM P0, REG_Y
     1319/     45C : 55 8B               	JMS PRINT_REGISTER_WITH_NAME_P0
     1320/     45E : 56 57               	JMS PRINT_CRLF
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 23 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 23 - 2023/02/24 22:59:16
 
 
     1321/     460 : 20 20               	FIM P0, REG_Z
@@ -1447,7 +1447,7 @@
     1378/     487 :                     ;;;---------------------------------------------------------------------------
     1379/     487 :                     SHIFT_FRACTION_LEFT_P0_ACC:
     1380/     487 : 14 A5               	JCN Z, SHIFTL_EXIT	; exit if ACC==0
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 24 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 24 - 2023/02/24 22:59:16
 
 
     1381/     489 : B5                  	XCH R5			; R5 = ACC = shift
@@ -1510,7 +1510,7 @@
     1438/     4B7 : 20 10               	FIM P0, REG_Y
     1439/     4B9 : 54 71               	JMS SHIFT_FRACTION_RIGHT_P0_ACC
     1440/     4BB : AA                  	LD R10
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 25 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 25 - 2023/02/24 22:59:16
 
 
     1441/     4BC : 2F                  	SRC P7
@@ -1573,7 +1573,7 @@
     1498/     4DD : EE                  	RD2
     1499/     4DE : 2D                  	SRC P6
     1500/     4DF : E6                  	WR2
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 26 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 26 - 2023/02/24 22:59:16
 
 
     1501/     4E0 :                     
@@ -1636,7 +1636,7 @@
     1558/     4FD :                     ;;; X = Y / X
     1559/     4FD :                     ;;;---------------------------------------------------------------------------
     1560/     4FD :                     CMDC_DIV:
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 27 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 27 - 2023/02/24 22:59:16
 
 
     1561/     4FD : 20 00               	FIM P0, REG_X
@@ -1699,7 +1699,7 @@
     1618/     537 : 20 10               	FIM P0, REG_Y
     1619/     539 : 54 71               	JMS SHIFT_FRACTION_RIGHT_P0_ACC ; shift frac(Y) and set exp(Y)=0
     1620/     53B : F0                  	CLB
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 28 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 28 - 2023/02/24 22:59:16
 
 
     1621/     53C : E4                  	WR0
@@ -1762,7 +1762,7 @@
     1678/     55E :                     
     1679/     55E :                     	;; check R9 is already 9
     1680/     55E :                     	;; it occurs when shifted divisor is truncated
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 29 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 29 - 2023/02/24 22:59:16
 
 
     1681/     55E :                     	;; (ex. previous loop 100/109 -> this loop 100/10)
@@ -1825,7 +1825,7 @@
     1738/     58B :                     ;;; output: ACC=0
     1739/     58B :                     ;;;---------------------------------------------------------------------------
     1740/     58B :                     PRINT_REGISTER_WITH_NAME_P0:
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 30 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 30 - 2023/02/24 22:59:16
 
 
     1741/     58B : 22 58               	FIM P1, 'X'
@@ -1888,7 +1888,7 @@
     1798/     5C0 : B1                  	XCH R1			; ( R1 = 14,13,..., 1)
     1799/     5C1 : 21                  	SRC P0
     1800/     5C2 : E9                  	RDM
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 31 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 31 - 2023/02/24 22:59:16
 
 
     1801/     5C3 : 56 4C               	JMS PRINT_ACC
@@ -1951,7 +1951,7 @@
 (1)   27/     600 :                     ;;;---------------------------------------------------------------------------
 (1)   28/     600 :                     
 (1)   29/     600 :                     GETCHAR_P1:
- AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 32 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 32 - 2023/02/24 22:59:16
 
 
 (1)   30/     600 : 2C 0C                       FIM R12R13, loop(4)     ; loop for first(lower) 4 bit
@@ -2014,7 +2014,7 @@
 (1)   87/     628 :                     ;;; Input: P1(R2,R3)
 (1)   88/     628 :                     ;;; Output: ACC=0
 (1)   89/     628 :                     ;;; Working: P6(R12R13), P7
- AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 33 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm(9600bps.inc) - Page 33 - 2023/02/24 22:59:16
 
 
 (1)   90/     628 :                     ;;; This subroutine destroys P6, P7.
@@ -2077,7 +2077,7 @@
     1841/     64C : 22 30               	FIM R2R3, 30H		;'0'
     1842/     64E : F1                  	CLC			; clear carry
     1843/     64F : FB                  	DAA			; ACC=ACC+6 if ACC>9 and set carry
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 34 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 34 - 2023/02/24 22:59:16
 
 
     1844/     650 : 1A 54               	JCN CN, PRINTACC_L1
@@ -2140,7 +2140,7 @@
     1901/     671 : C0                          BBL 0
     1902/     672 :                     
     1903/     672 :                     ;;;---------------------------------------------------------------------------
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 35 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 35 - 2023/02/24 22:59:16
 
 
     1904/     672 :                     ;;; CTOI_P1
@@ -2203,165 +2203,161 @@
     1961/     68F :                     BLINK_LED:
     1962/     68F : F4                  	CMA
     1963/     690 : F2                  	IAC
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 36 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 36 - 2023/02/24 22:59:16
 
 
     1964/     691 : BB                  	XCH R11         ; set counter=16-ACC
     1965/     692 :                     BLINK_L0	
     1966/     692 : D0                          LDM BANK_RAM1
     1967/     693 : 2E 40                       FIM P7, CHIP_RAM1
-    1968/     695 : 56 A6                       JMS BLINK_SUB
+    1968/     695 : 56 A1                       JMS BLINK_SUB
     1969/     697 :                     
     1970/     697 : D1                          LDM BANK_RAM2
     1971/     698 : 2E 00                       FIM P7, CHIP_RAM2
-    1972/     69A : 56 A6                       JMS BLINK_SUB
+    1972/     69A : 56 A1                       JMS BLINK_SUB
     1973/     69C :                     
-    1974/     69C : D1                          LDM BANK_RAM3
-    1975/     69D : 2E 40                       FIM P7, CHIP_RAM3
-    1976/     69F : 56 A6                       JMS BLINK_SUB
-    1977/     6A1 :                     	
-    1978/     6A1 : 7B 92                       ISZ R11, BLINK_L0
-    1979/     6A3 :                     
-    1980/     6A3 : D0                  	LDM BANK_DEFAULT
-    1981/     6A4 : FD                  	DCL
-    1982/     6A5 :                     
-    1983/     6A5 : C0                  	BBL 0
-    1984/     6A6 :                     
-    1985/     6A6 :                     BLINK_SUB:	
-    1986/     6A6 : FD                          DCL
-    1987/     6A7 : 2F                          SRC P7
-    1988/     6A8 : D8                          LDM 8
-    1989/     6A9 : E1                          WMP             ; LED(MSB) on
-    1990/     6AA : D8                          LDM 8
-    1991/     6AB : 56 B0                       JMS WAIT10MS    ; wait 80ms
-    1992/     6AD : D0                          LDM 0
-    1993/     6AE : E1                          WMP             ; LED off
-    1994/     6AF : C0                          BBL 0
-    1995/     6B0 :                     
-    1996/     6B0 :                     ;;;----------------------------------------------------------------------------
-    1997/     6B0 :                     ;;; WAIT10MS
-    1998/     6B0 :                     ;;; Input: ACC
-    1999/     6B0 :                     ;;; Output: return with ACC=0
-    2000/     6B0 :                     ;;; Destroy: P6, P7, (R12, R13, R14, R15)
-    2001/     6B0 :                     ;;;   wait for 10 * N ms (N=ACC, N=16 if ACC==0)
-    2002/     6B0 :                     ;;; 
-    2003/     6B0 :                     ;;; Constants '45EF'(10ms) is calculated by Jim's 4004 Delay Loop Calculator
-    2004/     6B0 :                     ;;; https://github.com/jim11662418/4004-delay-calculator
-    2005/     6B0 :                     ;;;
-    2006/     6B0 :                     ;;; 10.8003857uS/cycle (@5.185MHz clock)
-    2007/     6B0 :                     ;;;----------------------------------------------------------------------------
-    2008/     6B0 :                                     
-    2009/     6B0 :                     WAIT10MS:
-    2010/     6B0 : 2C 45               	FIM R12R13, 045H  ; 9947us delay(921 cycles)
-    2011/     6B2 : 2E EF                       FIM R14R15, 0EFH  ; 
-    2012/     6B4 :                     W10_L1:
-    2013/     6B4 : 7C B4                	ISZ R12, W10_L1
-    2014/     6B6 : 7D B4                       ISZ R13, W10_L1
-    2015/     6B8 : 7E B4                       ISZ R14, W10_L1
-    2016/     6BA : 7F B4                       ISZ R15, W10_L1
-    2017/     6BC : F8                          DAC
-    2018/     6BD : 1C B0                       JCN ZN, WAIT10MS  ; 9979us delay(924 cycles)/loop
-    2019/     6BF :                     W10_EXIT:
-    2020/     6BF : C0                  	BBL 0
-    2021/     6C0 :                     
-    2022/     6C0 :                     ;;;----------------------------------------------------------------------------
-    2023/     6C0 :                     ;;; Print subroutine and string data located in Page 7 (0700H-07FFH)
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 37 - 2023/02/24 18:57:45
+    1974/     69C : 7B 92                       ISZ R11, BLINK_L0
+    1975/     69E :                     
+    1976/     69E : D0                  	LDM BANK_DEFAULT
+    1977/     69F : FD                  	DCL
+    1978/     6A0 :                     
+    1979/     6A0 : C0                  	BBL 0
+    1980/     6A1 :                     
+    1981/     6A1 :                     BLINK_SUB:	
+    1982/     6A1 : FD                          DCL
+    1983/     6A2 : 2F                          SRC P7
+    1984/     6A3 : D8                          LDM 8
+    1985/     6A4 : E1                          WMP             ; LED(MSB) on
+    1986/     6A5 : D8                          LDM 8
+    1987/     6A6 : 56 AB                       JMS WAIT10MS    ; wait 80ms
+    1988/     6A8 : D0                          LDM 0
+    1989/     6A9 : E1                          WMP             ; LED off
+    1990/     6AA : C0                          BBL 0
+    1991/     6AB :                     
+    1992/     6AB :                     ;;;----------------------------------------------------------------------------
+    1993/     6AB :                     ;;; WAIT10MS
+    1994/     6AB :                     ;;; Input: ACC
+    1995/     6AB :                     ;;; Output: return with ACC=0
+    1996/     6AB :                     ;;; Destroy: P6, P7, (R12, R13, R14, R15)
+    1997/     6AB :                     ;;;   wait for 10 * N ms (N=ACC, N=16 if ACC==0)
+    1998/     6AB :                     ;;; 
+    1999/     6AB :                     ;;; Constants '45EF'(10ms) is calculated by Jim's 4004 Delay Loop Calculator
+    2000/     6AB :                     ;;; https://github.com/jim11662418/4004-delay-calculator
+    2001/     6AB :                     ;;;
+    2002/     6AB :                     ;;; 10.8003857uS/cycle (@5.185MHz clock)
+    2003/     6AB :                     ;;;----------------------------------------------------------------------------
+    2004/     6AB :                                     
+    2005/     6AB :                     WAIT10MS:
+    2006/     6AB : 2C 45               	FIM R12R13, 045H  ; 9947us delay(921 cycles)
+    2007/     6AD : 2E EF                       FIM R14R15, 0EFH  ; 
+    2008/     6AF :                     W10_L1:
+    2009/     6AF : 7C AF                	ISZ R12, W10_L1
+    2010/     6B1 : 7D AF                       ISZ R13, W10_L1
+    2011/     6B3 : 7E AF                       ISZ R14, W10_L1
+    2012/     6B5 : 7F AF                       ISZ R15, W10_L1
+    2013/     6B7 : F8                          DAC
+    2014/     6B8 : 1C AB                       JCN ZN, WAIT10MS  ; 9979us delay(924 cycles)/loop
+    2015/     6BA :                     W10_EXIT:
+    2016/     6BA : C0                  	BBL 0
+    2017/     6BB :                     
+    2018/     6BB :                     ;;;----------------------------------------------------------------------------
+    2019/     6BB :                     ;;; Print subroutine and string data located in Page 7 (0700H-07FFH)
+    2020/     6BB :                     ;;; 
+    2021/     6BB :                     ;;; The string data sould be located in the same page as the print routine.
+    2022/     6BB :                     ;;;----------------------------------------------------------------------------
+    2023/     700 :                             org 0700H
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 37 - 2023/02/24 22:59:16
 
 
-    2024/     6C0 :                     ;;; 
-    2025/     6C0 :                     ;;; The string data sould be located in the same page as the print routine.
-    2026/     6C0 :                     ;;;----------------------------------------------------------------------------
-    2027/     700 :                             org 0700H
-    2028/     700 :                     ;;;----------------------------------------------------------------------------
-    2029/     700 :                     ;;; PRINT_P0
-    2030/     700 :                     ;;; Input: P0 (top of the string is 0700H+P0)
-    2031/     700 :                     ;;; Working: P1(R2, R3)
-    2032/     700 :                     ;;; Destroy: P1, P6, P7 (by PUTCHAR_P1), 
-    2033/     700 :                     ;;;----------------------------------------------------------------------------
-    2034/     700 :                     
-    2035/     700 :                     PRINT_P0:
-    2036/     700 : 32                          FIN P1			; P1=(P0)
-    2037/     701 : A2                          LD R2
-    2038/     702 : 14 0B                       JCN Z, P7_UPPER0	; R2==0
-    2039/     704 :                     P7_PUT:
-    2040/     704 : 56 28                       JMS PUTCHAR_P1             ; putchar(P1)
-    2041/     706 : 71 00                       ISZ R1, PRINT_P0           ; P0=P0+1
-    2042/     708 : 60                          INC R0
-    2043/     709 : 47 00                       JUN PRINT_P0               ; print remaining string
-    2044/     70B :                     P7_UPPER0:
-    2045/     70B : A3                  	LD R3
-    2046/     70C : 1C 04                       JCN ZN, P7_PUT     	; R3 != 0
-    2047/     70E :                     P7_EXIT:
-    2048/     70E : C0                          BBL 0                   ; exit if P1(R2,R3) == 0
-    2049/     70F :                                     
-    2050/     70F :                     ;;;----------------------------------------------------------------------------
-    2051/     70F :                     ;;; String data
-    2052/     70F :                     ;;;----------------------------------------------------------------------------
-    2053/     70F :                     
-    2054/     70F :                     STR_OMSG:
-    2055/     70F : 0D 49 6E 74 65 6C   	data "\rIntel MCS-4 (4004)\r\nTiny Monitor\r\n", 0
+    2024/     700 :                     ;;;----------------------------------------------------------------------------
+    2025/     700 :                     ;;; PRINT_P0
+    2026/     700 :                     ;;; Input: P0 (top of the string is 0700H+P0)
+    2027/     700 :                     ;;; Working: P1(R2, R3)
+    2028/     700 :                     ;;; Destroy: P1, P6, P7 (by PUTCHAR_P1), 
+    2029/     700 :                     ;;;----------------------------------------------------------------------------
+    2030/     700 :                     
+    2031/     700 :                     PRINT_P0:
+    2032/     700 : 32                          FIN P1			; P1=(P0)
+    2033/     701 : A2                          LD R2
+    2034/     702 : 14 0B                       JCN Z, P7_UPPER0	; R2==0
+    2035/     704 :                     P7_PUT:
+    2036/     704 : 56 28                       JMS PUTCHAR_P1             ; putchar(P1)
+    2037/     706 : 71 00                       ISZ R1, PRINT_P0           ; P0=P0+1
+    2038/     708 : 60                          INC R0
+    2039/     709 : 47 00                       JUN PRINT_P0               ; print remaining string
+    2040/     70B :                     P7_UPPER0:
+    2041/     70B : A3                  	LD R3
+    2042/     70C : 1C 04                       JCN ZN, P7_PUT     	; R3 != 0
+    2043/     70E :                     P7_EXIT:
+    2044/     70E : C0                          BBL 0                   ; exit if P1(R2,R3) == 0
+    2045/     70F :                                     
+    2046/     70F :                     ;;;----------------------------------------------------------------------------
+    2047/     70F :                     ;;; String data
+    2048/     70F :                     ;;;----------------------------------------------------------------------------
+    2049/     70F :                     
+    2050/     70F :                     STR_OMSG:
+    2051/     70F : 0D 49 6E 74 65 6C   	data "\rIntel MCS-4 (4004)\r\nTiny Monitor\r\n", 0
               715 : 20 4D 43 53 2D 34 
               71B : 20 28 34 30 30 34 
               721 : 29 0D 0A 54 69 6E 
               727 : 79 20 4D 6F 6E 69 
               72D : 74 6F 72 0D 0A 00 
-    2056/     733 :                     STR_VFD_INIT:		;reset VFD and set scroll mode
-    2057/     733 : 1B 40 1F 02 00      	data 1bH, 40H, 1fH, 02H, 0
-    2058/     738 :                     STR_BANK:
-    2059/     738 : 20 42 41 4E 4B 3D   	data " BANK=", 0
+    2052/     733 :                     STR_VFD_INIT:		;reset VFD and set scroll mode
+    2053/     733 : 1B 40 1F 02 00      	data 1bH, 40H, 1fH, 02H, 0
+    2054/     738 :                     STR_BANK:
+    2055/     738 : 20 42 41 4E 4B 3D   	data " BANK=", 0
               73E : 00                
-    2060/     73F :                     STR_CHIP:
-    2061/     73F : 20 43 48 49 50 3D   	data " CHIP=", 0
+    2056/     73F :                     STR_CHIP:
+    2057/     73F : 20 43 48 49 50 3D   	data " CHIP=", 0
               745 : 00                
-    2062/     746 :                     STR_ADD:
-    2063/     746 : 20 41 44 44 28 46   	data " ADD(Fx0)=", 0
+    2058/     746 :                     STR_ADD:
+    2059/     746 : 20 41 44 44 28 46   	data " ADD(Fx0)=", 0
               74C : 78 30 29 3D 00    
-    2064/     751 :                     STR_CALC:
-    2065/     751 : 0D 0A 43 61 6C 63   	data "\r\nCalculator Mode\r\n", 0
+    2060/     751 :                     STR_CALC:
+    2061/     751 : 0D 0A 43 61 6C 63   	data "\r\nCalculator Mode\r\n", 0
               757 : 75 6C 61 74 6F 72 
               75D : 20 4D 6F 64 65 0D 
               763 : 0A 00             
-    2066/     765 :                     STR_CMDERR:
-    2067/     765 : 0D 0A 64 3A 64 75   	data "\r\nd:dump RAM, w:write RAM, W:Write PM, D:Dump PM\r\nC:Clear, c:Calc mode\r\n", 0 ;
+    2062/     765 :                     STR_CMDERR:
+    2063/     765 : 0D 0A 64 3A 64 75   	data "\r\nd:dump RAM, w:write RAM, W:Write PM, D:Dump PM\r\nC:Clear, c:Calc mode\r\n", 0 ;
               76B : 6D 70 20 52 41 4D 
               771 : 2C 20 77 3A 77 72 
               777 : 69 74 65 20 52 41 
               77D : 4D 2C 20 57 3A 57 
               783 : 72 69 74 65 20 50 
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 38 - 2023/02/24 18:57:45
-
-
               789 : 4D 2C 20 44 3A 44 
               78F : 75 6D 70 20 50 4D 
               795 : 0D 0A 43 3A 43 6C 
               79B : 65 61 72 2C 20 63 
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 38 - 2023/02/24 22:59:16
+
+
               7A1 : 3A 43 61 6C 63 20 
               7A7 : 6D 6F 64 65 0D 0A 
               7AD : 00                
-    2068/     7AE :                     STR_CALC_SQRT:
-    2069/     7AE : 20 53 51 52 0D 0A   	data " SQR\r\n",0
+    2064/     7AE :                     STR_CALC_SQRT:
+    2065/     7AE : 20 53 51 52 0D 0A   	data " SQR\r\n",0
               7B4 : 00                
-    2070/     7B5 :                     
-    2071/     7B5 :                     ;;;----------------------------------------------------------------------------
-    2072/     7B5 :                     ;;; String data
-    2073/     7B5 :                     ;;;----------------------------------------------------------------------------
-    2074/     7B5 :                     	
-    2075/     7B5 :                     ;;;---------------------------------------------------------------------------
-    2076/     7B5 :                     ;;; Subroutine for reading program memory located on page 15 (0F00H-0FFFH)
-    2077/     7B5 :                     ;;;---------------------------------------------------------------------------
-    2078/     7B5 :                     ;;; READPM_P0
-    2079/     7B5 :                     ;;; P1 = (P0)
-    2080/     7B5 :                     ;;; input: P0
-    2081/     7B5 :                     ;;; output: P1
-    2082/     7B5 :                     ;;;---------------------------------------------------------------------------
-    2083/     7B5 :                     ;;; 	org 0FF0H
-    2084/     7B5 :                     ;;; PM_READ_P0_P1:
-    2085/     7B5 : 32                  	FIN P1
-    2086/     7B6 : C0                  	BBL 0
-    2087/     7B7 :                     
-    2088/     7B7 :                     	end
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 39 - 2023/02/24 18:57:45
+    2066/     7B5 :                     
+    2067/     7B5 :                     ;;;----------------------------------------------------------------------------
+    2068/     7B5 :                     ;;; String data
+    2069/     7B5 :                     ;;;----------------------------------------------------------------------------
+    2070/     7B5 :                     	
+    2071/     7B5 :                     ;;;---------------------------------------------------------------------------
+    2072/     7B5 :                     ;;; Subroutine for reading program memory located on page 15 (0F00H-0FFFH)
+    2073/     7B5 :                     ;;;---------------------------------------------------------------------------
+    2074/     7B5 :                     ;;; READPM_P0
+    2075/     7B5 :                     ;;; P1 = (P0)
+    2076/     7B5 :                     ;;; input: P0
+    2077/     7B5 :                     ;;; output: P1
+    2078/     7B5 :                     ;;;---------------------------------------------------------------------------
+    2079/     7B5 :                     ;;; 	org 0FF0H
+    2080/     7B5 :                     ;;; PM_READ_P0_P1:
+    2081/     7B5 : 32                  	FIN P1
+    2082/     7B6 : C0                  	BBL 0
+    2083/     7B7 :                     
+    2084/     7B7 :                     	end
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 39 - 2023/02/24 22:59:16
 
 
   Symbol Table (* = unused):
@@ -2376,7 +2372,7 @@
  BANK_RAM2 :                      1 - |  BANK_RAM3 :                      1 - |
  BANK_SERIAL :                    1 - |  BAUDRATE :                    2580 - |
  BLINK_L0 :                     692 C |  BLINK_LED :                    68F C |
- BLINK_SUB :                    6A6 C | *CASESENSITIVE :                  0 - |
+ BLINK_SUB :                    6A1 C | *CASESENSITIVE :                  0 - |
  CHANGE_SIGN_REG_X :            4F6 C |  CHIP_PMSELECT :                  0 - |
  CHIP_RAM0 :                      0 - |  CHIP_RAM1 :                     40 - |
  CHIP_RAM2 :                      0 - |  CHIP_RAM3 :                     40 - |
@@ -2424,7 +2420,7 @@
 *CONSTPI :        3.141592653589793 - |  CTOI_09 :                      67B C |
  CTOI_P1 :                      672 C | *DATE :                "2023/02/24" - |
  DISPLED_P1 :                   67E C |  DIV_FRAC :                     53D C |
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 40 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 40 - 2023/02/24 22:59:16
 
 
  DIV_FRACTION_XY :              54C C |  DIV_FRAC_ADJ_EXP :             52A C |
@@ -2487,17 +2483,17 @@
  STR_CHIP :                     73F C |  STR_CMDERR :                   765 C |
  STR_OMSG :                     70F C |  STR_VFD_INIT :                 733 C |
  SUB_FRACTION_P6_P7 :           39E C |  SUB_FRA_LOOP :                 3A4 C |
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 41 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 41 - 2023/02/24 22:59:16
 
 
-*TIME :                  "18:57:45" - | *TRUE :                           1 - |
-*VERSION :                     142F - | *W10_EXIT :                     6BF C |
- W10_L1 :                       6B4 C |  WAIT10MS :                     6B0 C |
+*TIME :                  "22:59:16" - | *TRUE :                           1 - |
+*VERSION :                     142F - | *W10_EXIT :                     6BA C |
+ W10_L1 :                       6AF C |  WAIT10MS :                     6AB C |
 
     233 symbols
      32 unused symbols
 
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 42 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 42 - 2023/02/24 22:59:16
 
 
   Register Definitions (* = unused):
@@ -2515,7 +2511,7 @@
 
      17 definitions
 
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 43 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 43 - 2023/02/24 22:59:16
 
 
   Defined Functions:
@@ -2524,7 +2520,7 @@
 LOOPS                                 | LOOP                                 
 LO                                    |
 
- AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 44 - 2023/02/24 18:57:45
+ AS V1.42 Beta [Bld 236] - Source File calc.asm - Page 44 - 2023/02/24 22:59:16
 
 
   Code Pages:
@@ -2536,7 +2532,7 @@ STANDARD (0 changed characters)
 
 0.02 seconds assembly time
 
-   2226 lines source file
+   2222 lines source file
       2 passes
       0 errors
       0 warnings

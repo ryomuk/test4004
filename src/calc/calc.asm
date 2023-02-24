@@ -1971,10 +1971,6 @@ BLINK_L0
         FIM P7, CHIP_RAM2
         JMS BLINK_SUB
 
-        LDM BANK_RAM3
-        FIM P7, CHIP_RAM3
-        JMS BLINK_SUB
-	
         ISZ R11, BLINK_L0
 
 	LDM BANK_DEFAULT
