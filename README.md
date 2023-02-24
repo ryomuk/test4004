@@ -16,12 +16,19 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
   - 簡易モニター
   - 電卓
 
+## 実験用ボードの仕様
+- CPU: 4004
+- DATA RAM: 4002-1(320bit) x 4
+- Program Memory
+  - ROM: AT28C64B (8k x 8bit EEPROM)
+    - 000H〜EFFHの3.75KB利用可能
+  - RAM: HM6268(4k x 4bit SRAM)x 2個
+    - F00H〜FFDHの254byte x 16バンク, 合計約4KB
+- 通信ポート: 9600bps Software Serial UART (TTL level)
+
 ## ToDO
 - VTL的な言語
   - マンデルブロ集合を表示するぐらいのプログラムを実行させたい
-- プログラムメモリのRAM領域の拡大
-  - 現在の実装では256byteに制限されている
-→ バンク切り替えで256byte x 8面使えるようにした．(2023/2/20)
 - プリント基板作成
 
 ## 動画
