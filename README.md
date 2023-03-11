@@ -9,7 +9,7 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 
 ## 概要
 昨年，運良くIntel 4004を入手することができました．せっかくだから動かしてみようと思い，このプロジェクトを始めました．
-このレポジトリ(test4004)は電卓を作ったところまでで完成．続きはメモリ関連のハードウェアの変更も伴うので別レポジトリ(https://github.com/ryomuk/VTL4004)に移行します．
+このレポジトリ(test4004)は電卓を作ったところまでで完成．続きはメモリ関連のハードウェアの変更も伴うので別レポジトリ(https://github.com/ryomuk/VTL4004 )に移行します．
 
 ## これまでに作ったもの
 - 4004実験用ボード
