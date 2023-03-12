@@ -139,8 +139,9 @@ CMD_LOOP:
 L_CRLF:
 	JMS PRINT_CRLF		; CR or LF puts CRLF
 	JUN CMD_LOOP
-
 L0:
+	JMS PUTCHAR_P1
+
 	FIM P0, 'd'		; dump data memory
 	JMS CMP_P0P1
 	JCN ZN, L1
