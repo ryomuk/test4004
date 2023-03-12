@@ -1,7 +1,7 @@
 ;;;---------------------------------------------------------------------------
 ;;; Tiny Monitor with calculator program for Intel 4004 evaluation board
 ;;; by Ryo Mukai
-;;; 2023/02/23
+;;; 2023/03/12
 ;;;---------------------------------------------------------------------------
 
 ;;;---------------------------------------------------------------------------
@@ -61,33 +61,52 @@ R14R15  reg RERF
 ;;; Hardware Configuration
 ;;;---------------------------------------------------------------------------
 
-;;; BANK# for DCL
+;;; RAM0 and RAM1 must be 4002-1 and located in the BANK#0 (CM-RAM0).
+;;; For RAM2 and RAM3, 4002-2 is preferred, because it can be located
+;;; in the BANK#0 same as RAM0 and RAM1.
+;;; However -2 is more expensive and difficult to get than -1,
+;;; so the chip type of RAM2 and RAM3 is configurable.
+;;; If you use -1 for RAM2 and RAM3, they are located in
+;;; the BANK#1 (CM-RAM1), and DCL must be executed before SRC.
+
+;;; Chip type of RAM2 and RAM3
+RAM23TYPE	equ "4002-2"	; or "4002-1"
+
+;;; BANK# for DCL, and CHIP#=(D7.D6.000000) for SRC
 BANK_RAM0	equ 0
-BANK_RAM1      	equ 0
-BANK_RAM2      	equ 1
-BANK_RAM3      	equ 1
-
-;;; CHIP#=(D7.D6.000000)
 CHIP_RAM0      	equ 00H
+BANK_RAM1      	equ 0
 CHIP_RAM1      	equ 40H
+	if (RAM23TYPE == "4002-2")
+BANK_RAM2      	equ 0
+CHIP_RAM2      	equ 80H
+BANK_RAM3      	equ 0
+CHIP_RAM3      	equ 0C0H
+	elseif (RAM23TYPE == "4002-1")
+BANK_RAM2      	equ 1
 CHIP_RAM2      	equ 00H
+BANK_RAM3      	equ 1
 CHIP_RAM3      	equ 40H
+	endif
 
-;;; Serial Port (BANK# and CHIP#)
+;;; Default Bank
+;;; The CM-RAM line should be always set to BANK_DEFAULT
+;;; to omit DCL as much as possible.
+;;; (This is for when RAM23TYPE=="4002-1".)
+BANK_DEFAULT	equ BANK_RAM0
+		
+;;; Output port for serial interface
 BANK_SERIAL     equ BANK_RAM3
 CHIP_SERIAL     equ CHIP_RAM3
 
-;;; Program Memory
-PM_TOP          equ 0F00H
-PM_READ_P0_P1   equ 0FFEH
+;;; Output port for program memory bank selection
+BANK_PMSELECT	equ BANK_RAM0
+CHIP_PMSELECT   equ CHIP_RAM0
 
-;;; Port for PM Bank Selection(BANK# and CHIP#)
-BANK_PMSELECT     equ BANK_RAM0
-CHIP_PMSELECT     equ CHIP_RAM0
-
-;;; Default Bank
-BANK_DEFAULT	equ BANK_RAM0
-		
+;;; Program Memory RAM area
+PM_RAM_START	equ 0F00H	; Start address of program memory RAM
+PM_READ_P0_P1   equ 0FFEH	; Entry of the subroutine to read RAM
+				; "FIN P1 and BBL 0"
 ;;;---------------------------------------------------------------------------
 ;;; Program Start
 ;;;---------------------------------------------------------------------------
@@ -113,20 +132,12 @@ CMD_LOOP:
         FIM P1, ']'		; prompt
         JMS PUTCHAR_P1
 
-L_CR:
 	JMS GETCHAR_P1
         JMS DISPLED_P1
-	FIM P0, '\r'
-	JMS CMP_P0P1
-	JCN Z, L_CR		; skip CR
-
-	JMS PUTCHAR_P1		; echo input
-
-	FIM P0, '\n'
-	JMS CMP_P0P1
-	JCN ZN, L0
-	FIM P1, '\r'
-	JMS PUTCHAR_P1		; put CR
+	JMS ISCRLF_P1
+	JCN Z, L0
+L_CRLF:
+	JMS PRINT_CRLF		; CR or LF puts CRLF
 	JUN CMD_LOOP
 
 L0:
@@ -230,6 +241,29 @@ CMP_EXIT01:
 	BBL 0			;P0==P1, ACC=0, CY=1
 CMP_EXIT11
 	BBL 1			;P0>P1,  ACC=1, CY=1
+
+;;;---------------------------------------------------------------------------
+;;; ISCRLF_P1
+;;; check if P1=='\r' | P1=='\n'
+;;; input: P0
+;;; output: ACC=1 if P1=='\r' || P1=='\n'
+;;;         ACC=0 P1!='\r' && P1!='\n'
+;;;---------------------------------------------------------------------------
+ISCRLF_P1:
+	LD R2
+	JCN NZ, ISCRLF_EXIT0	; check upper 4bit
+	CLC
+	LDM '\r'
+	SUB R3
+	JCN Z, ISCRLF_EXIT1	; check lower 4bit
+	CLC
+	LDM '\n'
+	SUB R3
+	JCN Z, ISCRLF_EXIT1	; check lower 4bit
+ISCRLF_EXIT0:
+	BBL 0
+ISCRLF_EXIT1:
+	BBL 1
 	
 ;;;---------------------------------------------------------------------------
 ;;; PM_WRITE_P0_P1
@@ -597,7 +631,7 @@ COMMAND_BP:
 ;;;---------------------------------------------------------------------------
 COMMAND_G:
 	JMS PRINT_CRLF
-	JMS PM_TOP
+	JMS PM_RAM_START
 	JUN CMD_LOOP		; return to command loop
 
 ;;;---------------------------------------------------------------------------
@@ -693,13 +727,9 @@ CMDC_START:
 CMDC_LOOP:		; loop for input digits to REG_X
 	JMS GETCHAR_P1
         JMS DISPLED_P1
-	FIM P0, '\r'
-	JMS CMP_P0P1
-	JCN Z, CMDC_LOOP	; skip CR
-
-	FIM P0, '\n'		; 'ENTER' key
-	JMS CMP_P0P1
-	JCN ZN, CMDC_L1
+	JMS ISCRLF_P1
+	JCN Z, CMDC_L1
+CMDC_CRLF:
 	JMS PRINT_CRLF
 	JMS CMDC_ENTER
 	JUN CMDC_START
@@ -2076,7 +2106,7 @@ STR_CALC_SQRT:
 ;;; input: P0
 ;;; output: P1
 ;;;---------------------------------------------------------------------------
-;;; 	org 0FF0H
+;;; 	org 0FFEH
 ;;; PM_READ_P0_P1:
 	FIN P1
 	BBL 0
