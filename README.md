@@ -32,7 +32,9 @@ If necessary, please use a translation service such as DeepL (I recommend this) 
 ## ToDO
 - VTL的な言語
   - マンデルブロ集合を表示するぐらいのプログラムを実行させたい
+  - →作りました．( https://github.com/ryomuk/VTL4004 )
 - プリント基板作成
+  - →作りました．( https://github.com/ryomuk/emu8080on4004 )
 
 ## 動画
 Youtubeで関連動画を公開しています．
