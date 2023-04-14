@@ -1,7 +1,7 @@
 ;;;---------------------------------------------------------------------------
 ;;; Tiny Monitor with calculator program for Intel 4004 evaluation board
 ;;; by Ryo Mukai
-;;; 2023/03/12
+;;; 2023/04/14
 ;;;---------------------------------------------------------------------------
 
 ;;;---------------------------------------------------------------------------
@@ -214,57 +214,6 @@ SETBANKCHIP_P5:
 	XCH R11 	;set D3D2.00@X2 to R11 (0000 or 0100 or 1000 or 1100)
 	JMS PRINT_CRLF
 	BBL 0
-	
-;;;---------------------------------------------------------------------------
-;;; CMP_P0P1
-;;; compare P0(R0R1) and P1(R2R3)
-;;; input: P0, P1
-;;; output: ACC=1,CY=0 if P0<P1
-;;;         ACC=0,CY=1 if P0==P1 
-;;;         ACC=1,CY=1 if P0>P1
-;;; P0 - P1 (the carry bit is a complement of the borrow)
-;;;---------------------------------------------------------------------------
-CMP_P0P1:
-	CLB
-	LD R0			
-	SUB R2			;R0-R2
-	JCN Z, CMP_L1
-	JCN C, CMP_EXIT11
-	BBL 1			;P0<P1,  ACC=1, CY=0
-CMP_L1:	
-	CLB
-	LD R1
-	SUB R3			;R1-R3
-	JCN Z, CMP_EXIT01
-	JCN C, CMP_EXIT11
-	BBL 1			;P0<P1,  ACC=1, CY=0
-CMP_EXIT01:
-	BBL 0			;P0==P1, ACC=0, CY=1
-CMP_EXIT11
-	BBL 1			;P0>P1,  ACC=1, CY=1
-
-;;;---------------------------------------------------------------------------
-;;; ISCRLF_P1
-;;; check if P1=='\r' | P1=='\n'
-;;; input: P0
-;;; output: ACC=1 if P1=='\r' || P1=='\n'
-;;;         ACC=0 P1!='\r' && P1!='\n'
-;;;---------------------------------------------------------------------------
-ISCRLF_P1:
-	LD R2
-	JCN NZ, ISCRLF_EXIT0	; check upper 4bit
-	CLC
-	LDM '\r'
-	SUB R3
-	JCN Z, ISCRLF_EXIT1	; check lower 4bit
-	CLC
-	LDM '\n'
-	SUB R3
-	JCN Z, ISCRLF_EXIT1	; check lower 4bit
-ISCRLF_EXIT0:
-	BBL 0
-ISCRLF_EXIT1:
-	BBL 1
 	
 ;;;---------------------------------------------------------------------------
 ;;; PM_WRITE_P0_P1
@@ -2046,6 +1995,57 @@ W10_L1:
 W10_EXIT:
 	BBL 0
 
+;;;---------------------------------------------------------------------------
+;;; CMP_P0P1
+;;; compare P0(R0R1) and P1(R2R3)
+;;; input: P0, P1
+;;; output: ACC=1,CY=0 if P0<P1
+;;;         ACC=0,CY=1 if P0==P1 
+;;;         ACC=1,CY=1 if P0>P1
+;;; P0 - P1 (the carry bit is a complement of the borrow)
+;;;---------------------------------------------------------------------------
+CMP_P0P1:
+	CLB
+	LD R0			
+	SUB R2			;R0-R2
+	JCN Z, CMP_L1
+	JCN C, CMP_EXIT11
+	BBL 1			;P0<P1,  ACC=1, CY=0
+CMP_L1:	
+	CLB
+	LD R1
+	SUB R3			;R1-R3
+	JCN Z, CMP_EXIT01
+	JCN C, CMP_EXIT11
+	BBL 1			;P0<P1,  ACC=1, CY=0
+CMP_EXIT01:
+	BBL 0			;P0==P1, ACC=0, CY=1
+CMP_EXIT11
+	BBL 1			;P0>P1,  ACC=1, CY=1
+
+;;;---------------------------------------------------------------------------
+;;; ISCRLF_P1
+;;; check if P1=='\r' | P1=='\n'
+;;; input: P0
+;;; output: ACC=1 if P1=='\r' || P1=='\n'
+;;;         ACC=0 P1!='\r' && P1!='\n'
+;;;---------------------------------------------------------------------------
+ISCRLF_P1:
+	LD R2
+	JCN NZ, ISCRLF_EXIT0	; check upper 4bit
+	CLC
+	LDM '\r'
+	SUB R3
+	JCN Z, ISCRLF_EXIT1	; check lower 4bit
+	CLC
+	LDM '\n'
+	SUB R3
+	JCN Z, ISCRLF_EXIT1	; check lower 4bit
+ISCRLF_EXIT0:
+	BBL 0
+ISCRLF_EXIT1:
+	BBL 1
+	
 ;;;----------------------------------------------------------------------------
 ;;; Print subroutine and string data located in Page 7 (0700H-07FFH)
 ;;; 
